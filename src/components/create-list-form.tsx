@@ -24,7 +24,7 @@ const CLAIM_RULE_OPTIONS = [
   },
 ] as const;
 
-export function CreateListForm() {
+export function CreateListForm({ today }: { today: string }) {
   const [state, action, pending] = useActionState<CreateListState, FormData>(
     createList,
     {},
@@ -87,9 +87,11 @@ export function CreateListForm() {
 
         <div>
           <label htmlFor="eventDate">
-            <CapsLabel className="mb-[7px]">Date</CapsLabel>
+            <CapsLabel className="mb-[7px]">Event date</CapsLabel>
           </label>
-          <Input id="eventDate" name="eventDate" type="date" />
+          {/* Lists are one-off, so the event is always ahead of us. `today`
+              comes from the server to avoid a hydration mismatch. */}
+          <Input id="eventDate" name="eventDate" type="date" min={today} />
         </div>
       </div>
 

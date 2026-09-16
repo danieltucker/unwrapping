@@ -23,7 +23,7 @@ export default function NewListPage() {
             <span className="h-[3px] w-[26px] rounded-pill bg-paper/28" />
           </div>
         </header>
-        <CreateListForm />
+        <CreateListForm today={new Date().toISOString().slice(0, 10)} />
       </Card>
     </main>
   );

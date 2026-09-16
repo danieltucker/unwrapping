@@ -121,6 +121,12 @@ export async function ensureDraftToken(): Promise<string> {
   return token;
 }
 
+/** The draft token if this browser holds one. Safe to call while rendering. */
+export const readDraftToken = cache(async (): Promise<string | null> => {
+  const signed = (await cookies()).get(DRAFT_COOKIE)?.value;
+  return signed ? verify(signed) : null;
+});
+
 /** The guest token if this browser already has one, without issuing a new one. */
 export const readGuestToken = cache(async (): Promise<string | null> => {
   const signed = (await cookies()).get(GUEST_COOKIE)?.value;
