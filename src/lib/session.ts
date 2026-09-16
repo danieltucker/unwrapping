@@ -57,6 +57,7 @@ export const getCurrentUser = cache(async () => {
   const row = await db
     .select({
       id: users.id,
+      handle: users.handle,
       name: users.name,
       email: users.email,
       expiresAt: sessions.expiresAt,
@@ -68,7 +69,8 @@ export const getCurrentUser = cache(async () => {
 
   if (!row || row.expiresAt.getTime() < Date.now()) return null;
 
-  return { id: row.id, name: row.name, email: row.email };
+  // The handle appears in every list URL, so callers routinely need it.
+  return { id: row.id, handle: row.handle, name: row.name, email: row.email };
 });
 
 export async function destroySession(): Promise<void> {

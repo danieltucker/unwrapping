@@ -8,6 +8,20 @@
       "when": 1789572416718,
       "tag": "0000_living_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789576892114,
+      "tag": "0001_tricky_lake",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789581053477,
+      "tag": "0002_sticky_doctor_faustus",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { items } from "@/db/schema";
 import { requireOwnedList } from "@/lib/list-access";
 import { sourceDomain } from "@/lib/outbound";
+import { manageList } from "@/lib/routes";
 import { parsePriceToCents, scrapeProduct, type ScrapeResult } from "@/lib/scrape";
 
 export type PreviewState = { result?: ScrapeResult; error?: string };
@@ -16,15 +17,16 @@ export async function previewGift(
   _previous: PreviewState,
   formData: FormData,
 ): Promise<PreviewState> {
-  const slug = String(formData.get("slug") ?? "");
+  const handle = String(formData.get("handle") ?? "");
+  const key = String(formData.get("key") ?? "");
+
   // Scraping runs on the owner's behalf, so verify ownership before fetching.
-  await requireOwnedList(slug);
+  await requireOwnedList(handle, key);
 
   const url = String(formData.get("url") ?? "").trim();
   if (!url) return { error: "Paste a link first." };
 
-  const result = await scrapeProduct(url);
-  return { result };
+  return { result: await scrapeProduct(url) };
 }
 
 export type AddGiftState = { error?: string };
@@ -33,8 +35,9 @@ export async function addGift(
   _previous: AddGiftState,
   formData: FormData,
 ): Promise<AddGiftState> {
-  const slug = String(formData.get("slug") ?? "");
-  const list = await requireOwnedList(slug);
+  const handle = String(formData.get("handle") ?? "");
+  const key = String(formData.get("key") ?? "");
+  const { list, ownerHandle } = await requireOwnedList(handle, key);
 
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "A gift needs a title." };
@@ -63,7 +66,10 @@ export async function addGift(
   }
 
   const selectedImageIndex = Math.min(
-    Math.max(Number.parseInt(String(formData.get("selectedImageIndex") ?? "0"), 10) || 0, 0),
+    Math.max(
+      Number.parseInt(String(formData.get("selectedImageIndex") ?? "0"), 10) || 0,
+      0,
+    ),
     Math.max(images.length - 1, 0),
   );
 
@@ -96,5 +102,5 @@ export async function addGift(
     needsAttention: images.length === 0 ? "no-photo" : null,
   });
 
-  redirect(`/lists/${slug}`);
+  redirect(manageList(list, ownerHandle));
 }

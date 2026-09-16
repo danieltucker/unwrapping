@@ -11,10 +11,10 @@ export default function NewListPage() {
       <Card>
         <header className="flex items-center justify-between bg-ink px-7 py-[22px]">
           <div>
-            <p className="mb-[7px] text-[10.5px] font-semibold uppercase tracking-[1.6px] text-champagne">
+            <p className="mb-[7px] text-2xs font-semibold uppercase tracking-[1.6px] text-champagne">
               Step 1 of 2
             </p>
-            <h1 className="font-display text-[30px] leading-[1.1] tracking-[-.8px] text-paper">
+            <h1 className="font-display text-[1.875rem] leading-[1.1] tracking-[-.8px] text-paper">
               Name your list
             </h1>
           </div>

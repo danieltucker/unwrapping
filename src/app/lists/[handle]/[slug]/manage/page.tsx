@@ -6,23 +6,28 @@ import { CopyButton } from "@/components/copy-button";
 import { EyeOffIcon } from "@/components/ui";
 import { formatPrice } from "@/config/site";
 import { db } from "@/db";
-import { items, type Item } from "@/db/schema";
+import { items, type Item, type List } from "@/db/schema";
 import { formatEventDate, relativeEvent } from "@/lib/date";
 import { requireOwnedList } from "@/lib/list-access";
+import * as routes from "@/lib/routes";
 
-export async function generateMetadata({ params }: PageProps<"/lists/[slug]">) {
-  const { slug } = await params;
-  const list = await requireOwnedList(slug);
+export async function generateMetadata({
+  params,
+}: PageProps<"/lists/[handle]/[slug]/manage">) {
+  const { handle, slug } = await params;
+  const { list } = await requireOwnedList(handle, slug);
   return { title: list.name };
 }
 
 /**
- * The owner's editor. Stats, filters and drag-to-reorder still to come —
- * and by design it shows a claim *count* only, never which gifts are claimed.
+ * The owner's editor. By design it shows a claim *count* only, never which
+ * gifts are claimed — see getPublicList for where that is enforced.
  */
-export default async function EditorPage({ params }: PageProps<"/lists/[slug]">) {
-  const { slug } = await params;
-  const list = await requireOwnedList(slug);
+export default async function EditorPage({
+  params,
+}: PageProps<"/lists/[handle]/[slug]/manage">) {
+  const { handle, slug } = await params;
+  const { list, ownerHandle } = await requireOwnedList(handle, slug);
 
   const gifts = await db
     .select()
@@ -33,7 +38,8 @@ export default async function EditorPage({ params }: PageProps<"/lists/[slug]">)
 
   const host = (await headers()).get("host") ?? "localhost:3000";
   const protocol = host.startsWith("localhost") ? "http" : "https";
-  const url = `${protocol}://${host}/${slug}`;
+  const short = routes.shortLink(list);
+  const shareUrl = `${protocol}://${host}${short ?? routes.publicList(list, ownerHandle)}`;
 
   const eventLine = [formatEventDate(list.eventDate), relativeEvent(list.eventDate)]
     .filter(Boolean)
@@ -44,40 +50,54 @@ export default async function EditorPage({ params }: PageProps<"/lists/[slug]">)
       <header className="mb-[22px] flex flex-wrap items-start justify-between gap-4">
         <div>
           {eventLine ? (
-            <p className="mb-[9px] text-[11px] font-semibold uppercase tracking-[1.6px] text-ink-62">
+            <p className="mb-[9px] text-2xs font-semibold uppercase tracking-[1.6px] text-ink-62">
               {eventLine}
             </p>
           ) : null}
-          <h1 className="mb-[9px] font-display text-[40px] leading-[1.05] tracking-[-1.2px]">
+          <h1 className="mb-[9px] font-display text-[2.5rem] leading-[1.05] tracking-[-1.2px]">
             <span className="mr-3">{list.emoji}</span>
             {list.name}
           </h1>
-          <p className="text-[13px] font-medium text-ink-72">
+          <p className="text-sm font-medium text-ink-72">
             {gifts.length === 0
               ? "No gifts yet"
               : `${gifts.length} ${gifts.length === 1 ? "gift" : "gifts"}`}
             <span className="px-2 opacity-40">·</span>
-            {list.sharedAt ? "Live" : "Not shared yet"}
+            {ownerHandle ? "Saved to your account" : "Draft — not saved to an account"}
           </p>
         </div>
-        <Link
-          href={`/lists/${slug}/add`}
-          className="rounded-pill bg-violet px-5 py-[11px] text-[13.5px] font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
-        >
-          + Add gift
-        </Link>
+        <div className="flex flex-wrap gap-[10px]">
+          <Link
+            href={routes.publicList(list, ownerHandle)}
+            className="rounded-pill border border-ink-line-strong bg-surface px-[18px] py-[11px] text-sm font-semibold"
+          >
+            Preview as guest
+          </Link>
+          <Link
+            href={routes.addGift(list, ownerHandle)}
+            className="rounded-pill bg-violet px-5 py-[11px] text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
+          >
+            + Add gift
+          </Link>
+        </div>
       </header>
 
       <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-ink-line bg-surface px-4 py-3">
-        <span className="flex-1 truncate font-mono text-[13.5px] font-medium text-ink/82">
-          {url.replace(/^https?:\/\//, "")}
+        <span className="flex-1 truncate font-mono text-sm font-medium text-ink/82">
+          {shareUrl.replace(/^https?:\/\//, "")}
         </span>
-        <CopyButton value={url} label="Copy link" />
+        <CopyButton value={shareUrl} label="Copy link" />
+        <Link
+          href={routes.shareList(list, ownerHandle)}
+          className="rounded-pill border border-ink-line-strong px-[15px] py-2 text-xs font-semibold"
+        >
+          QR code
+        </Link>
       </div>
 
       <div className="mb-[22px] flex items-center gap-3 rounded-[12px] border border-violet-edge bg-violet-wash px-4 py-[13px]">
         <EyeOffIcon className="shrink-0 text-violet" />
-        <p className="text-[12.5px] leading-[1.55] text-ink/80">
+        <p className="text-xs leading-[1.55] text-ink/80">
           <strong className="font-semibold">You&rsquo;ll only ever see a count.</strong>{" "}
           Guests see live status; which gifts are claimed stays hidden from you.
         </p>
@@ -85,20 +105,25 @@ export default async function EditorPage({ params }: PageProps<"/lists/[slug]">)
 
       {gifts.length === 0 ? (
         <Link
-          href={`/lists/${slug}/add`}
+          href={routes.addGift(list, ownerHandle)}
           className="block rounded-[12px] border border-dashed border-ink-line-strong px-6 py-12 text-center transition-colors duration-150 hover:bg-ink/[.02]"
         >
-          <span className="mb-2 block text-[15px] font-semibold">
+          <span className="mb-2 block text-base font-semibold">
             Nothing on the list yet
           </span>
-          <span className="block text-[13px] leading-[1.7] text-ink-72">
+          <span className="block text-sm leading-[1.7] text-ink-72">
             Paste a link from any shop and we&rsquo;ll fill in the rest.
           </span>
         </Link>
       ) : (
         <ul className="flex flex-col gap-2">
           {gifts.map((gift) => (
-            <GiftRow key={gift.id} gift={gift} />
+            <GiftRow
+              key={gift.id}
+              gift={gift}
+              list={list}
+              ownerHandle={ownerHandle}
+            />
           ))}
         </ul>
       )}
@@ -106,7 +131,15 @@ export default async function EditorPage({ params }: PageProps<"/lists/[slug]">)
   );
 }
 
-function GiftRow({ gift }: { gift: Item }) {
+function GiftRow({
+  gift,
+  list,
+  ownerHandle,
+}: {
+  gift: Item;
+  list: List;
+  ownerHandle: string | null;
+}) {
   const image = gift.images[gift.selectedImageIndex] ?? gift.images[0] ?? null;
   const needsPhoto = gift.needsAttention === "no-photo";
 
@@ -121,7 +154,7 @@ function GiftRow({ gift }: { gift: Item }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={image} alt="" className="h-full w-full object-cover" />
         ) : (
-          <span className="flex h-full items-center justify-center text-center text-[9px] leading-tight text-ink-62">
+          <span className="flex h-full items-center justify-center text-center text-2xs leading-tight text-ink-62">
             No
             <br />
             photo
@@ -131,13 +164,13 @@ function GiftRow({ gift }: { gift: Item }) {
 
       <div className="min-w-0 flex-1">
         <div className="mb-[3px] flex flex-wrap items-center gap-2">
-          <span className="text-[14.5px] font-semibold">{gift.title}</span>
+          <span className="text-sm font-semibold">{gift.title}</span>
           {gift.isMostWanted ? <Badge tone="violet">Most wanted</Badge> : null}
           {gift.isGroupGift ? <Badge tone="rose">Group gift</Badge> : null}
           {gift.quantity > 1 ? <Badge tone="neutral">Qty {gift.quantity}</Badge> : null}
         </div>
         <p
-          className={`text-[12px] ${needsPhoto ? "font-medium text-amber-dark" : "text-ink-72"}`}
+          className={`text-xs ${needsPhoto ? "font-medium text-amber-dark" : "text-ink-72"}`}
         >
           {needsPhoto
             ? "No photo found — items with a photo get claimed far more often"
@@ -147,9 +180,16 @@ function GiftRow({ gift }: { gift: Item }) {
         </p>
       </div>
 
-      <span className="text-[16px] font-semibold">
+      <span className="text-base font-semibold">
         {gift.priceCents === null ? "—" : formatPrice(gift.priceCents)}
       </span>
+
+      <Link
+        href={routes.editGift(list, ownerHandle, gift.id)}
+        className="rounded-control border border-ink-line px-3 py-[6px] text-xs font-semibold text-ink-72 transition-colors duration-150 hover:bg-ink/[.03]"
+      >
+        Edit
+      </Link>
     </li>
   );
 }
@@ -169,7 +209,7 @@ function Badge({
 
   return (
     <span
-      className={`rounded-pill px-2 py-[2px] text-[10.5px] font-semibold ${tones[tone]}`}
+      className={`rounded-pill px-2 py-[2px] text-2xs font-semibold ${tones[tone]}`}
     >
       {children}
     </span>

@@ -7,6 +7,7 @@ function cx(...parts: (string | false | null | undefined)[]) {
 }
 
 type ButtonVariant = "primary" | "outline" | "dark";
+type ButtonSize = "sm" | "md";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-violet text-white hover:bg-violet-hover",
@@ -14,17 +15,29 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   dark: "bg-ink text-paper hover:bg-ink/90",
 };
 
+// Sized in rem (Tailwind's scale) rather than px, so buttons grow with the
+// reader's browser font size instead of ignoring it. Sizes must match across
+// variants or side-by-side buttons disagree on height.
+const BUTTON_SIZES: Record<ButtonSize, string> = {
+  sm: "px-4 py-2.5 text-xs",
+  md: "px-6 py-3 text-sm",
+};
+
+/** Shared geometry, so any two buttons placed together line up. */
+export const buttonBase =
+  "inline-flex items-center justify-center rounded-pill font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60";
+
 export function Button({
   variant = "primary",
+  size = "md",
   className,
   ...props
-}: ComponentProps<"button"> & { variant?: ButtonVariant }) {
+}: ComponentProps<"button"> & { variant?: ButtonVariant; size?: ButtonSize }) {
   return (
     <button
       className={cx(
-        // Every primary button is a pill; radius is fixed by the system.
-        "rounded-pill px-[22px] py-3 text-[13.5px] font-semibold transition-colors duration-150",
-        "disabled:cursor-not-allowed disabled:opacity-60",
+        buttonBase,
+        BUTTON_SIZES[size],
         BUTTON_VARIANTS[variant],
         className,
       )}
@@ -62,7 +75,7 @@ export function CapsLabel({
   return (
     <div
       className={cx(
-        "text-[11px] font-semibold uppercase tracking-[.9px] text-ink-66",
+        "text-2xs font-semibold uppercase tracking-[.9px] text-ink-66",
         className,
       )}
     >
@@ -76,7 +89,7 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
     <input
       className={cx(
         "w-full rounded-control border border-ink-line-strong bg-surface px-[14px] py-3",
-        "text-[14.5px] font-medium text-ink placeholder:text-ink-62 focus-ring",
+        "text-sm font-medium text-ink placeholder:text-ink-62 focus-ring",
         className,
       )}
       {...props}
@@ -89,7 +102,7 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
     <textarea
       className={cx(
         "w-full rounded-control border border-ink-line-strong bg-surface px-[14px] py-3",
-        "text-[14px] leading-[1.65] text-ink/85 placeholder:text-ink-62 focus-ring",
+        "text-sm leading-[1.65] text-ink/85 placeholder:text-ink-62 focus-ring",
         className,
       )}
       {...props}
@@ -132,7 +145,7 @@ export function SurprisePanel({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-3 rounded-[12px] border border-violet-edge bg-violet-wash px-4 py-[13px]">
       <EyeOffIcon className="shrink-0 text-violet" stroke="currentColor" />
-      <p className="text-[12.5px] leading-[1.55] text-ink/80">{children}</p>
+      <p className="text-xs leading-[1.55] text-ink/80">{children}</p>
     </div>
   );
 }

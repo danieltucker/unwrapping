@@ -44,6 +44,14 @@
   --color-rose-on-ink: #e85a93;
   --color-pine-on-ink: #3fbfa1;
 
+  /* One step below Tailwind's smallest. The design's caps labels sit at
+     10.5–11px, and inflating them to 12px would flatten a real distinction.
+     Every other size maps onto the standard rem scale. */
+  --text-2xs: 0.6875rem;
+  /* Paired line-height, so text-2xs behaves like every other step in the scale
+     rather than inheriting whatever its parent happens to set. */
+  --text-2xs--line-height: 1.4;
+
   --font-sans: var(--font-gabarito), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
   --font-mono: ui-monospace, Menlo, monospace;
@@ -75,6 +83,16 @@
   :focus-visible {
     outline: 2px solid var(--color-violet);
     outline-offset: 2px;
+  }
+
+  /* Tailwind's preflight sets margin:0 on every element, which overrides the
+     browser's own `margin: auto` on <dialog> — a modal then pins to the top
+     left instead of centring. Restore it, and keep a tall dialog scrollable
+     rather than letting it run off a short screen. */
+  dialog {
+    margin: auto;
+    max-height: calc(100dvh - 48px);
+    overflow: auto;
   }
 }
 

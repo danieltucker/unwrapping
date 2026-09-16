@@ -253,6 +253,23 @@ function amazonSignals($: Api): Partial<ParsedProduct> & { rawPrice?: string } {
   return { title, rawPrice, images };
 }
 
+/**
+ * Identity of the *picture*, ignoring size variants — a CDN will happily serve
+ * one photo under a dozen URLs. Amazon's are the worst offender:
+ * .../images/I/81C8FISc9rL._AC_SL1500_.jpg and ._AC_SX466_.jpg are one image,
+ * and offering both as choices makes the photo picker look broken.
+ */
+function imageKey(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const amazonId = parsed.pathname.match(/\/images\/I\/([A-Za-z0-9_+-]+?)\./)?.[1];
+    if (amazonId) return `${parsed.hostname}/${amazonId}`;
+    return `${parsed.hostname}${parsed.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
 export function parseProduct(html: string, baseUrl: string): ParsedProduct {
   const $ = cheerio.load(html);
   const meta = (selector: string) => $(selector).attr("content")?.trim() || null;
@@ -307,11 +324,15 @@ export function parseProduct(html: string, baseUrl: string): ParsedProduct {
   ];
 
   const images: string[] = [];
+  const seen = new Set<string>();
   for (const candidate of candidates) {
     if (!candidate) continue;
     try {
       const absolute = new URL(candidate, baseUrl).toString();
-      if (!images.includes(absolute)) images.push(absolute);
+      const key = imageKey(absolute);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      images.push(absolute);
     } catch {
       // Skip anything that isn't a resolvable URL.
     }

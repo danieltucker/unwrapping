@@ -1,28 +1,77 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
 import { db } from "@/db";
-import { lists, type List } from "@/db/schema";
+import { lists, users, type List } from "@/db/schema";
+import { DRAFT_SEGMENT } from "@/lib/routes";
 import { getCurrentUser, readDraftToken } from "@/lib/session";
 
+export type ResolvedList = {
+  list: List;
+  /** Null while the list is an unclaimed draft. */
+  ownerHandle: string | null;
+};
+
 /**
- * Owner-only access to a list's private screens (editor, share step).
+ * Finds the list behind /lists/<handle>/<key>, without any permission check.
  *
- * A list is reachable either by its signed-in owner or, while it is still an
- * anonymous draft, by the browser holding the draft cookie. Anything else gets
- * a 404 rather than a 403 — a wrong guess shouldn't confirm the list exists.
+ * For an owned list the key is its slug, unique per owner. For a draft the
+ * handle segment is `drafts` and the key is the short code, because draft slugs
+ * are not unique — two people can both start "birthday" before signing up.
  */
-export async function requireOwnedList(slug: string): Promise<List> {
-  const list = await db.select().from(lists).where(eq(lists.slug, slug)).get();
-  if (!list) notFound();
+export async function resolveList(
+  handle: string,
+  key: string,
+): Promise<ResolvedList | null> {
+  if (handle === DRAFT_SEGMENT) {
+    const list = await db
+      .select()
+      .from(lists)
+      .where(and(eq(lists.shortCode, key), isNull(lists.ownerId)))
+      .get();
+
+    return list ? { list, ownerHandle: null } : null;
+  }
+
+  const row = await db
+    .select({ list: lists, handle: users.handle })
+    .from(lists)
+    .innerJoin(users, eq(users.id, lists.ownerId))
+    .where(and(eq(users.handle, handle), eq(lists.slug, key)))
+    .get();
+
+  return row ? { list: row.list, ownerHandle: row.handle } : null;
+}
+
+/** True when this viewer owns the list — signed in as the owner, or holding its draft cookie. */
+export async function viewerOwns(resolved: ResolvedList): Promise<boolean> {
+  const { list } = resolved;
 
   const user = await getCurrentUser();
-  if (user && list.ownerId === user.id) return list;
+  if (user && list.ownerId === user.id) return true;
 
-  const draftToken = await readDraftToken();
-  if (draftToken && list.draftToken === draftToken) return list;
+  if (list.ownerId === null) {
+    const draftToken = await readDraftToken();
+    return draftToken !== null && list.draftToken === draftToken;
+  }
 
-  notFound();
+  return false;
+}
+
+/**
+ * Owner-only access to a list's private screens.
+ *
+ * A viewer who doesn't own it gets a 404 rather than a 403: a wrong guess
+ * shouldn't confirm that the list exists.
+ */
+export async function requireOwnedList(
+  handle: string,
+  key: string,
+): Promise<ResolvedList> {
+  const resolved = await resolveList(handle, key);
+  if (!resolved) notFound();
+  if (!(await viewerOwns(resolved))) notFound();
+  return resolved;
 }

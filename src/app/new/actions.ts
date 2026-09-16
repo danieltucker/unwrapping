@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { CLAIM_RULES, lists, type ClaimRule } from "@/db/schema";
+import { uniqueShortCode } from "@/lib/handle";
+import { shareList } from "@/lib/routes";
 import { ensureDraftToken } from "@/lib/session";
 import { getCurrentUser } from "@/lib/session";
 import { uniqueSlug } from "@/lib/slug";
@@ -46,17 +48,34 @@ export async function createList(
   const user = await getCurrentUser();
   const draftToken = user ? null : await ensureDraftToken();
 
-  await db.insert(lists).values({
-    ownerId: user?.id ?? null,
-    draftToken,
-    slug,
+  // Every list gets a short share code at birth, so there is always something
+  // to paste into a message — including drafts with no owner in their URL yet.
+  const shortCode = await uniqueShortCode(async (candidate) => {
+    const row = await db
+      .select({ id: lists.id })
+      .from(lists)
+      .where(eq(lists.shortCode, candidate))
+      .get();
+    return Boolean(row);
+  });
+
+  const created = await db
+    .insert(lists)
+    .values({
+      ownerId: user?.id ?? null,
+      draftToken,
+      slug,
+      shortCode,
     name,
     emoji: String(formData.get("emoji") ?? "🎁"),
     eventDate,
     note: String(formData.get("note") ?? "").trim() || null,
-    claimRule: parseClaimRule(formData.get("claimRule")),
-  });
+      claimRule: parseClaimRule(formData.get("claimRule")),
+    })
+    .returning({ slug: lists.slug, shortCode: lists.shortCode })
+    .get();
 
   // redirect() throws a control-flow exception, so it must sit outside try/catch.
-  redirect(`/lists/${slug}/share`);
+  // A draft has no handle yet, so this lands on its short-code URL.
+  redirect(shareList(created, user?.handle ?? null));
 }

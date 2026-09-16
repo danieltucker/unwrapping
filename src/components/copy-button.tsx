@@ -33,7 +33,7 @@ export function CopyButton({
       }}
       className={
         className ??
-        "rounded-pill bg-ink px-[15px] py-2 text-[12.5px] font-semibold text-paper transition-colors duration-150 hover:bg-ink/90"
+        "rounded-pill bg-ink px-[15px] py-2 text-xs font-semibold text-paper transition-colors duration-150 hover:bg-ink/90"
       }
     >
       {copied ? "Copied" : label}

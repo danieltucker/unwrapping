@@ -64,7 +64,7 @@ export function CreateListForm({ today }: { today: string }) {
               type="button"
               onClick={() => setPickedEmoji(false)}
               title="Suggest an emoji from the name"
-              className="flex shrink-0 items-center gap-[7px] border-r border-ink-line bg-violet-wash px-[13px] text-[19px]"
+              className="flex shrink-0 items-center gap-[7px] border-r border-ink-line bg-violet-wash px-[13px] text-xl"
             >
               {emoji}
               <svg width="9" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
@@ -80,7 +80,7 @@ export function CreateListForm({ today }: { today: string }) {
               required
               maxLength={80}
               autoFocus
-              className="w-full bg-transparent px-[14px] py-3 text-[14.5px] font-medium text-ink outline-none placeholder:text-ink-62"
+              className="w-full bg-transparent px-[14px] py-3 text-sm font-medium text-ink outline-none placeholder:text-ink-62"
             />
           </div>
         </div>
@@ -96,7 +96,7 @@ export function CreateListForm({ today }: { today: string }) {
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-[10px]">
-        <span className="text-[12px] font-medium text-ink-66">
+        <span className="text-xs font-medium text-ink-66">
           {phrase ? `Suggested from "${phrase}":` : "Suggestions:"}
         </span>
         <div className="flex flex-wrap gap-[6px]">
@@ -111,7 +111,7 @@ export function CreateListForm({ today }: { today: string }) {
                   setEmoji(option);
                   setPickedEmoji(true);
                 }}
-                className={`flex h-[34px] w-[34px] items-center justify-center rounded-control text-[17px] transition-colors duration-150 ${
+                className={`flex h-[34px] w-[34px] items-center justify-center rounded-control text-lg transition-colors duration-150 ${
                   selected
                     ? "border-[1.5px] border-violet bg-violet/10"
                     : "border border-ink-line bg-surface hover:bg-ink/[.03]"
@@ -144,7 +144,7 @@ export function CreateListForm({ today }: { today: string }) {
 
       <fieldset className="mb-5 overflow-hidden rounded-[12px] border border-ink-line bg-surface">
         <legend className="sr-only">Who can claim a gift</legend>
-        <div className="border-b border-ink-line px-4 py-[13px] text-[13px] font-semibold">
+        <div className="border-b border-ink-line px-4 py-[13px] text-sm font-semibold">
           Who can claim a gift
         </div>
         {CLAIM_RULE_OPTIONS.map((option, index) => (
@@ -162,8 +162,8 @@ export function CreateListForm({ today }: { today: string }) {
               className="mt-[3px] h-4 w-4 shrink-0 accent-violet"
             />
             <span>
-              <span className="block text-[13.5px] font-semibold">{option.title}</span>
-              <span className="block text-[12.5px] leading-[1.55] text-ink-72">
+              <span className="block text-sm font-semibold">{option.title}</span>
+              <span className="block text-xs leading-[1.55] text-ink-72">
                 {option.detail}
               </span>
             </span>
@@ -181,13 +181,13 @@ export function CreateListForm({ today }: { today: string }) {
       </div>
 
       {state.error ? (
-        <p role="alert" className="mb-4 text-[12.5px] font-medium text-rose-dark">
+        <p role="alert" className="mb-4 text-xs font-medium text-rose-dark">
           {state.error}
         </p>
       ) : null}
 
       <div className="flex items-center justify-between gap-4">
-        <span className="text-[12.5px] text-ink-66">All of this is editable later</span>
+        <span className="text-xs text-ink-66">All of this is editable later</span>
         <Button type="submit" disabled={pending}>
           {pending ? "Creating…" : "Add some gifts"}
         </Button>

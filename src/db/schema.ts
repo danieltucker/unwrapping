@@ -20,6 +20,8 @@ const createdAt = () =>
 /** List owners. Guests never get a row here — they are identified by a cookie token. */
 export const users = sqliteTable("users", {
   id: id(),
+  // Appears in every public list URL: /lists/<handle>/<slug>
+  handle: text("handle").notNull().unique(),
   email: text("email").notNull().unique(),
   // Nothing is emailed yet; the column exists so verification can be added
   // later without a migration.
@@ -58,7 +60,14 @@ export const lists = sqliteTable(
     }),
     // Identifies the draft's creator by cookie until they have an account.
     draftToken: text("draft_token"),
-    slug: text("slug").notNull().unique(),
+    /**
+     * Unique per owner, not globally — two people may both have a "birthday"
+     * list. Null owners (anonymous drafts) are exempt: SQLite treats NULLs as
+     * distinct, and a draft is reachable by short code until it's claimed.
+     */
+    slug: text("slug").notNull(),
+    /** The short share link: /<shortCode> redirects to the canonical URL. */
+    shortCode: text("short_code").unique(),
     name: text("name").notNull(),
     emoji: text("emoji").notNull().default("🎁"),
     eventDate: integer("event_date", { mode: "timestamp" }),
@@ -80,6 +89,7 @@ export const lists = sqliteTable(
   (t) => [
     index("lists_owner_idx").on(t.ownerId),
     index("lists_draft_idx").on(t.draftToken),
+    uniqueIndex("lists_owner_slug_idx").on(t.ownerId, t.slug),
   ],
 );
 
@@ -135,6 +145,12 @@ export const claims = sqliteTable(
       .references(() => items.id, { onDelete: "cascade" }),
     /** Signed cookie value identifying a guest with no account. */
     guestToken: text("guest_token").notNull(),
+    /**
+     * Set once a guest creates or signs into an account in that browser, so
+     * their reservations survive a cleared cookie or a different device.
+     * Never exposed to a list's owner.
+     */
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     firstName: text("first_name"),
     markedBought: integer("marked_bought", { mode: "boolean" })
       .notNull()
@@ -145,6 +161,7 @@ export const claims = sqliteTable(
   (t) => [
     index("claims_item_idx").on(t.itemId),
     index("claims_guest_idx").on(t.guestToken),
+    index("claims_user_idx").on(t.userId),
     // A guest cannot hold the same item twice at once. Partial, so a released
     // claim doesn't block re-claiming later.
     uniqueIndex("claims_item_guest_live_idx")
