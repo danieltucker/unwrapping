@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Save your list" };
 export default async function SignUpPage() {
   if (await getCurrentUser()) redirect("/");
 
-  // "You've added four gifts already" — the reason to bother signing up.
+  // "You've added four gifts already": the reason to bother signing up.
   const draftToken = await readDraftToken();
   let giftCount = 0;
 

@@ -2,6 +2,7 @@
 
 import { useRef, type ReactNode } from "react";
 
+import { Modal } from "@/components/modal";
 import { Button, LinkIcon } from "@/components/ui";
 
 /**
@@ -29,11 +30,7 @@ export function ShareDialog({ children }: { children: ReactNode }) {
         Share
       </Button>
 
-      <dialog
-        ref={dialog}
-        aria-labelledby="share-heading"
-        className="w-[min(30rem,calc(100vw-2rem))] rounded-card border border-ink-line bg-paper p-0 text-ink shadow-card backdrop:bg-ink/40"
-      >
+      <Modal dialogRef={dialog} size="md" labelledBy="share-heading">
         <div className="p-7">
           <h2
             id="share-heading"
@@ -56,7 +53,7 @@ export function ShareDialog({ children }: { children: ReactNode }) {
             Done
           </button>
         </div>
-      </dialog>
+      </Modal>
     </>
   );
 }

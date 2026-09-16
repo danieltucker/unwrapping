@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, type RefObject } from "react";
+import { useActionState, useRef, useState } from "react";
 
 import {
   deleteItem,
@@ -8,10 +8,14 @@ import {
   updateItem,
   type EditItemState,
 } from "@/app/lists/[handle]/[slug]/manage/items/[itemId]/edit/actions";
+import {
+  GiftEmojiField,
+  GiftPhotoField,
+  GiftUploadDialog,
+} from "@/components/gift-photo-fields";
 import { GoalField } from "@/components/goal-field";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
 import { centsToInput } from "@/config/site";
-import { uploadPhoto, type UploadState } from "@/lib/photo-actions";
 import type { Item } from "@/db/schema";
 
 /** Identifies the list in every form on this page. */
@@ -27,9 +31,14 @@ export function EditGiftForm({
     {},
   );
   const [selected, setSelected] = useState(item.selectedImageIndex);
+  const [title, setTitle] = useState(item.title);
+  const [emoji, setEmoji] = useState<string | null>(item.emoji);
   // A group gift needs a goal, so the field only appears once it's one.
   const [isGroupGift, setIsGroupGift] = useState(item.isGroupGift);
   const uploadDialog = useRef<HTMLDialogElement>(null);
+
+  // Kind is fixed once the gift exists, so this only decides what is shown.
+  const cash = item.kind === "cash";
 
   // After an upload the server selects the new photo; follow it so the
   // preview shows what was just added rather than the old choice.
@@ -38,8 +47,6 @@ export function EditGiftForm({
     setLastFromServer(item.selectedImageIndex);
     setSelected(item.selectedImageIndex);
   }
-
-  const preview = item.images[selected] ?? item.images[0] ?? null;
 
   return (
     <div className="p-[26px]">
@@ -50,47 +57,13 @@ export function EditGiftForm({
         <input type="hidden" name="selectedImageIndex" value={selected} />
 
         <div className="mb-[18px] flex gap-[15px]">
-          <div className="w-24 shrink-0">
-            {/* The photo is the control: clicking it is how you change it. */}
-            <button
-              type="button"
-              onClick={() => uploadDialog.current?.showModal()}
-              aria-label={preview ? "Change the photo" : "Add a photo"}
-              className="group relative mb-2 block h-[118px] w-24 overflow-hidden rounded-[9px] bg-ink/[.05] focus-ring"
-            >
-              {preview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={preview} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="flex h-full items-center justify-center px-2 text-center text-2xs text-ink-62">
-                  No photo
-                </span>
-              )}
-              <span className="absolute inset-x-0 bottom-0 bg-ink/72 py-[5px] text-2xs font-semibold text-paper opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-                {preview ? "Change" : "Add a photo"}
-              </span>
-            </button>
-
-            {item.images.length > 1 ? (
-              <div className="flex flex-wrap gap-[5px]">
-                {item.images.map((image, index) => (
-                  <button
-                    key={image}
-                    type="button"
-                    onClick={() => setSelected(index)}
-                    aria-label={`Use photo ${index + 1}`}
-                    aria-pressed={index === selected}
-                    className={`h-6 w-5 overflow-hidden rounded-[5px] ${
-                      index === selected ? "ring-[1.5px] ring-violet" : "opacity-70"
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={image} alt="" className="h-full w-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
+          <GiftPhotoField
+            images={item.images}
+            selected={selected}
+            onSelect={setSelected}
+            emoji={emoji}
+            onOpenUpload={() => uploadDialog.current?.showModal()}
+          />
 
           <div className="flex min-w-0 flex-1 flex-col gap-[11px]">
             <div>
@@ -100,47 +73,54 @@ export function EditGiftForm({
               <Input
                 id="title"
                 name="title"
-                defaultValue={item.title}
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
                 required
                 maxLength={160}
                 className="py-[9px] text-sm"
               />
             </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label htmlFor="price">
-                  <CapsLabel className="mb-[5px] text-2xs">Price</CapsLabel>
-                </label>
-                <Input
-                  id="price"
-                  name="price"
-                  inputMode="decimal"
-                  defaultValue={centsToInput(item.priceCents)}
-                  placeholder="—"
-                  className="py-[9px] text-sm"
-                />
+            {cash ? null : (
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label htmlFor="price">
+                    <CapsLabel className="mb-[5px] text-2xs">Price</CapsLabel>
+                  </label>
+                  <Input
+                    id="price"
+                    name="price"
+                    inputMode="decimal"
+                    defaultValue={centsToInput(item.priceCents)}
+                    placeholder="-"
+                    className="py-[9px] text-sm"
+                  />
+                </div>
+                <div className="w-[72px] shrink-0">
+                  <label htmlFor="quantity">
+                    <CapsLabel className="mb-[5px] text-2xs">Qty</CapsLabel>
+                  </label>
+                  <Input
+                    id="quantity"
+                    name="quantity"
+                    type="number"
+                    min={1}
+                    max={20}
+                    defaultValue={item.quantity}
+                    className="py-[9px] text-sm"
+                  />
+                </div>
               </div>
-              <div className="w-[72px] shrink-0">
-                <label htmlFor="quantity">
-                  <CapsLabel className="mb-[5px] text-2xs">Qty</CapsLabel>
-                </label>
-                <Input
-                  id="quantity"
-                  name="quantity"
-                  type="number"
-                  min={1}
-                  max={20}
-                  defaultValue={item.quantity}
-                  className="py-[9px] text-sm"
-                />
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
+        <GiftEmojiField title={title} value={emoji} onChange={setEmoji} />
+
         <div className="mb-4">
           <label htmlFor="reason">
-            <CapsLabel className="mb-[5px] text-2xs">Why you want it</CapsLabel>
+            <CapsLabel className="mb-[5px] text-2xs">
+              {cash ? "What it's for" : "Why you want it"}
+            </CapsLabel>
           </label>
           <Textarea
             id="reason"
@@ -162,27 +142,30 @@ export function EditGiftForm({
               className="h-4 w-4 accent-violet"
             />
           </label>
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-control border border-ink-line bg-surface px-[13px] py-[11px]">
-            <span>
-              <span className="block text-sm font-semibold">
-                Let guests chip in together
+          {cash ? null : (
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-control border border-ink-line bg-surface px-[13px] py-[11px]">
+              <span>
+                <span className="block text-sm font-semibold">
+                  Let guests chip in together
+                </span>
+                <span className="block text-2xs text-ink-72">
+                  Splits the price across several people
+                </span>
               </span>
-              <span className="block text-2xs text-ink-72">
-                Splits the price across several people
-              </span>
-            </span>
-            <input
-              type="checkbox"
-              name="isGroupGift"
-              checked={isGroupGift}
-              onChange={(event) => setIsGroupGift(event.target.checked)}
-              className="h-4 w-4 accent-violet"
-            />
-          </label>
+              <input
+                type="checkbox"
+                name="isGroupGift"
+                checked={isGroupGift}
+                onChange={(event) => setIsGroupGift(event.target.checked)}
+                className="h-4 w-4 accent-violet"
+              />
+            </label>
+          )}
 
-          {isGroupGift ? (
+          {cash || isGroupGift ? (
             <GoalField
               defaultValue={centsToInput(item.goalCents ?? item.priceCents)}
+              cash={cash}
             />
           ) : null}
         </div>
@@ -199,11 +182,15 @@ export function EditGiftForm({
       </form>
 
       {/* Sits outside the form above: a form cannot be nested inside another. */}
-      <UploadDialog
+      <GiftUploadDialog
         dialogRef={uploadDialog}
-        item={item}
+        hasPhoto={item.images.length > 0}
+        // The server attaches the photo to the item and revalidates, so the
+        // new one arrives through props; nothing to carry here.
+        onUploaded={() => {}}
         handle={handle}
         listKey={listKey}
+        itemId={item.id}
       />
 
       {/* Repair and destruction both live down here, out of the way. */}
@@ -212,75 +199,6 @@ export function EditGiftForm({
         <DeleteItem item={item} handle={handle} listKey={listKey} />
       </div>
     </div>
-  );
-}
-
-function UploadDialog({
-  dialogRef,
-  item,
-  handle,
-  listKey,
-}: {
-  dialogRef: RefObject<HTMLDialogElement | null>;
-  item: Item;
-} & ListKeys) {
-  const [state, action, pending] = useActionState<UploadState, FormData>(
-    uploadPhoto,
-    {},
-  );
-
-  // Close once the photo lands; an error keeps it open so it can be read.
-  useEffect(() => {
-    if (state.url) dialogRef.current?.close();
-  }, [state.url, dialogRef]);
-
-  return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby={`upload-heading-${item.id}`}
-      className="w-[min(420px,calc(100vw-32px))] rounded-card border border-ink-line bg-paper p-0 text-ink shadow-card backdrop:bg-ink/40"
-    >
-      <form action={action} className="p-6">
-        <input type="hidden" name="handle" value={handle} />
-        <input type="hidden" name="key" value={listKey} />
-        <input type="hidden" name="itemId" value={item.id} />
-
-        <h2
-          id={`upload-heading-${item.id}`}
-          className="mb-2 font-display text-[1.5rem] leading-[1.1] tracking-[-.6px]"
-        >
-          {item.images.length > 0 ? "Add another photo" : "Add a photo"}
-        </h2>
-        <p className="mb-4 text-xs leading-[1.6] text-ink-72">
-          JPEG, PNG, WebP, GIF or AVIF, up to 8MB. Portrait crops look best.
-        </p>
-
-        <input
-          type="file"
-          name="photo"
-          required
-          accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
-          className="mb-4 w-full text-xs file:mr-3 file:rounded-pill file:border-0 file:bg-ink/[.06] file:px-4 file:py-2 file:text-xs file:font-semibold"
-        />
-
-        {state.error ? (
-          <p role="alert" className="mb-4 text-xs font-medium text-rose-dark">
-            {state.error}
-          </p>
-        ) : null}
-
-        <Button type="submit" disabled={pending} className="mb-2 w-full">
-          {pending ? "Uploading…" : "Upload photo"}
-        </Button>
-        <button
-          type="button"
-          onClick={() => dialogRef.current?.close()}
-          className="w-full text-center text-sm font-semibold text-ink-72"
-        >
-          Never mind
-        </button>
-      </form>
-    </dialog>
   );
 }
 

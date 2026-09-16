@@ -19,7 +19,7 @@ export type ResolvedList = {
  *
  * For an owned list the key is its slug, unique per owner. For a draft the
  * handle segment is `drafts` and the key is the short code, because draft slugs
- * are not unique — two people can both start "birthday" before signing up.
+ * are not unique; two people can both start "birthday" before signing up.
  */
 export async function resolveList(
   handle: string,
@@ -45,7 +45,7 @@ export async function resolveList(
   return row ? { list: row.list, ownerHandle: row.handle } : null;
 }
 
-/** True when this viewer owns the list — signed in as the owner, or holding its draft cookie. */
+/** True when this viewer owns the list: signed in as the owner, or holding its draft cookie. */
 export async function viewerOwns(resolved: ResolvedList): Promise<boolean> {
   const { list } = resolved;
 

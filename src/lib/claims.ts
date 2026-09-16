@@ -3,7 +3,13 @@ import "server-only";
 import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { claims, contributions, items, type List } from "@/db/schema";
+import {
+  claims,
+  contributions,
+  items,
+  type ItemKind,
+  type List,
+} from "@/db/schema";
 import { fundingForList, raisedForList } from "@/lib/contributions";
 import { isStillOpen } from "@/lib/funding";
 import { resolveList, viewerOwns } from "@/lib/list-access";
@@ -13,10 +19,14 @@ import { outboundHref } from "@/lib/outbound";
 
 export type PublicItem = {
   id: string;
+  /** "cash" changes the words, never the arithmetic; see the items table. */
+  kind: ItemKind;
   title: string;
   href: string | null;
   sourceDomain: string | null;
   image: string | null;
+  /** Stands in for the photo when there is none. */
+  emoji: string | null;
   priceCents: number | null;
   quantity: number;
   reason: string | null;
@@ -28,7 +38,7 @@ export type PublicItem = {
   contributorCount: number;
   /** What the viewer themselves has put in, so the card can say so. */
   yourContributionCents: number;
-  /** Live claims. Always 0 for the owner of a surprise list — see getPublicList. */
+  /** Live claims. Always 0 for the owner of a surprise list; see getPublicList. */
   claimedCount: number;
   /** How many of those claims have been marked bought. Same blindfold applies. */
   boughtCount: number;
@@ -36,6 +46,15 @@ export type PublicItem = {
   /** Whether the viewer has ticked their own claim off as bought. */
   boughtByViewer: boolean;
   unitsFree: number;
+  /**
+   * Where to post this gift, for someone who holds a live claim on it.
+   *
+   * Null for everyone else, the owner included. The card tree is a client
+   * component, so anything on this type is serialized into the page: gating it
+   * here is what keeps a home address out of the payload sent to a guest who
+   * has claimed nothing.
+   */
+  deliveryAddress: string | null;
 };
 
 export type PublicListView = {
@@ -52,7 +71,7 @@ export type PublicListView = {
  * The public list as a specific viewer may see it.
  *
  * THE RULE: on a surprise list the owner never learns which gifts are claimed.
- * That is enforced here, in the data layer, not in the template — such an
+ * That is enforced here, in the data layer, not in the template: such an
  * owner's session is given zeroed claim counts, so no component can leak what
  * it was never handed. Treat any change to this function as a data change, not
  * a UI one.
@@ -136,10 +155,12 @@ export async function getPublicList(
 
     return {
       id: item.id,
+      kind: item.kind,
       title: item.title,
       href: outboundHref(item.url),
       sourceDomain: item.sourceDomain,
       image: item.images[item.selectedImageIndex] ?? item.images[0] ?? null,
+      emoji: item.emoji,
       priceCents: item.priceCents,
       quantity: item.quantity,
       reason: item.reason,
@@ -156,6 +177,7 @@ export async function getPublicList(
       claimedByViewer: viewerClaim !== undefined,
       boughtByViewer: viewerClaim?.markedBought ?? false,
       unitsFree: Math.max(item.quantity - claimedCount, 0),
+      deliveryAddress: viewerClaim ? list.deliveryAddress : null,
     };
   });
 
@@ -264,7 +286,7 @@ export async function getOwnerStats(list: List): Promise<OwnerStats> {
 export type ItemStatus = { claimedCount: number; boughtCount: number };
 
 /**
- * Per-item claim status for the owner's editor — or null, which means "this
+ * Per-item claim status for the owner's editor, or null, which means "this
  * owner may not know".
  *
  * Returning null rather than an empty map is the point: a caller can't mistake

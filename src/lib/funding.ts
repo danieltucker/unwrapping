@@ -2,7 +2,7 @@ import { formatPrice } from "@/config/site";
 
 /**
  * Group-gift arithmetic and the words for it. Pure, so the server and the
- * browser answer "is this one still open?" identically — a filter that
+ * browser answer "is this one still open?" identically; a filter that
  * disagreed with the count above it would look like a bug.
  */
 
@@ -28,7 +28,7 @@ export function isStillOpen(item: {
     : item.unitsFree > 0;
 }
 
-/** "£244 of £420 raised" — the text half of the status, never colour alone. */
+/** "£244 of £420 raised": the text half of the status, never colour alone. */
 export function fundingLine(raisedCents: number, goalCents: number | null): string {
   if (!goalCents) return `${formatPrice(raisedCents)} raised so far`;
   if (raisedCents >= goalCents) return `${formatPrice(goalCents)} goal reached`;

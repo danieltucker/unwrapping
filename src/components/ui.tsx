@@ -169,7 +169,7 @@ export function EyeOffIcon({
 }
 
 
-/** Pencil — "edit what this is", as opposed to editing a gift. */
+/** Pencil: "edit what this is", as opposed to editing a gift. */
 export function PencilIcon({ size = 15, className }: { size?: number; className?: string }) {
   return (
     <svg
@@ -206,6 +206,70 @@ export function LinkIcon({ size = 15, className }: { size?: number; className?: 
     >
       <path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7l-1.4 1.4" />
       <path d="M13.5 10.5a4 4 0 0 0-5.7 0L5 13.3a4 4 0 1 0 5.7 5.7l1.4-1.4" />
+    </svg>
+  );
+}
+
+/** A parcel: anything about getting a gift to the door rather than to the list. */
+export function BoxIcon({ size = 18, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M3 8.5 12 4l9 4.5v7L12 20l-9-4.5v-7Z" />
+      <path d="M3 8.5 12 13l9-4.5" />
+      <path d="M12 13v7" />
+    </svg>
+  );
+}
+
+/** The X that closes a modal. Always in the same corner, on every one of them. */
+export function CloseIcon({ size = 15, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M6 6l12 12" />
+      <path d="M18 6 6 18" />
+    </svg>
+  );
+}
+
+/** A note of money: everything to do with cash gifts and how to send them. */
+export function WalletIcon({ size = 18, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18a2 2 0 0 1 2 2v1" />
+      <path d="M3 7.5v9A2.5 2.5 0 0 0 5.5 19H19a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H5.5A2.5 2.5 0 0 1 3 7.5Z" />
+      <path d="M16.5 14h.01" />
     </svg>
   );
 }

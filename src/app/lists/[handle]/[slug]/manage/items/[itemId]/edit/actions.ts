@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { items, type Item } from "@/db/schema";
+import { parseGiftEmoji } from "@/lib/emoji";
 import { requireOwnedList, type ResolvedList } from "@/lib/list-access";
 import { sourceDomain } from "@/lib/outbound";
 import * as routes from "@/lib/routes";
@@ -68,7 +69,12 @@ export async function updateItem(
     Math.max(item.images.length - 1, 0),
   );
 
-  const isGroupGift = formData.get("isGroupGift") === "on";
+  // Stands in for a photo wherever there is none.
+  const emoji = parseGiftEmoji(formData.get("emoji"));
+
+  // A gift cannot change kind after it exists: the guests looking at it have
+  // been told what it is. Cash stays a group gift.
+  const isGroupGift = item.kind === "cash" || formData.get("isGroupGift") === "on";
   const rawGoal = String(formData.get("goal") ?? "").trim();
   const parsedGoal = rawGoal ? parsePriceToCents(rawGoal) : null;
   if (isGroupGift && rawGoal && parsedGoal === null) {
@@ -80,13 +86,17 @@ export async function updateItem(
     .set({
       title,
       priceCents,
-      quantity,
+      quantity: item.kind === "cash" ? 1 : quantity,
       selectedImageIndex,
+      emoji,
       reason: String(formData.get("reason") ?? "").trim() || null,
       isMostWanted: formData.get("isMostWanted") === "on",
       isGroupGift,
       goalCents: isGroupGift ? (parsedGoal ?? priceCents ?? item.goalCents) : null,
-      needsAttention: item.images.length === 0 ? "no-photo" : null,
+      needsAttention:
+        item.kind === "thing" && item.images.length === 0 && !emoji
+          ? "no-photo"
+          : null,
     })
     .where(eq(items.id, itemId));
 
@@ -113,8 +123,8 @@ export async function deleteItem(
 /**
  * Re-reads the product page and fills in what the shop now gives us.
  *
- * A price typed by hand is kept — the owner's own correction outranks a
- * scrape — but a missing title or photo is replaced gladly.
+ * A price typed by hand is kept, because the owner's own correction outranks a
+ * scrape, but a missing title or photo is replaced gladly.
  */
 export async function refetchItem(
   _previous: EditItemState,
@@ -159,6 +169,6 @@ export async function refetchItem(
   return {
     message: changes.length
       ? `Updated the ${changes.join(", ")}.`
-      : "Nothing new to bring across — it's already up to date.",
+      : "Nothing new to bring across. It's already up to date.",
   };
 }

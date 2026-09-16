@@ -23,7 +23,7 @@ export function AccountMenu({
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);
 
-  // Close on Escape or a click elsewhere — a menu that traps you is worse
+  // Close on Escape or a click elsewhere; a menu that traps you is worse
   // than no menu.
   useEffect(() => {
     if (!open) return;

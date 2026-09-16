@@ -29,6 +29,20 @@
       "when": 1789589798382,
       "tag": "0003_worried_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789596810633,
+      "tag": "0004_dusty_mole_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789597848897,
+      "tag": "0005_common_silver_centurion",
+      "breakpoints": true
     }
   ]
 }

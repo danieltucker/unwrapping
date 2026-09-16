@@ -44,7 +44,7 @@ export default async function PublicListPage({
               You&rsquo;re previewing your own list.
             </strong>{" "}
             {list.surpriseMode
-              ? "Every gift looks free to you because claims are hidden from you — that isn’t what your guests see."
+              ? "Every gift looks free to you because claims are hidden from you. That isn’t what your guests see."
               : "Surprise is off for this list, so you see the same statuses your guests do. Reserving is theirs to do."}{" "}
             <Link
               href={routes.manageList(list, ownerHandle)}
@@ -83,7 +83,7 @@ export default async function PublicListPage({
               label="Price range"
               value={
                 stats.minCents === null
-                  ? "—"
+                  ? "-"
                   : `${formatPrice(stats.minCents)} – ${formatPrice(stats.maxCents ?? stats.minCents)}`
               }
             />

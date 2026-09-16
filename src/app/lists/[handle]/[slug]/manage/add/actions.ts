@@ -4,7 +4,8 @@ import { eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
-import { items } from "@/db/schema";
+import { items, type ItemKind } from "@/db/schema";
+import { parseGiftEmoji } from "@/lib/emoji";
 import { requireOwnedList } from "@/lib/list-access";
 import { sourceDomain } from "@/lib/outbound";
 import { manageList } from "@/lib/routes";
@@ -42,7 +43,11 @@ export async function addGift(
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "A gift needs a title." };
 
-  const url = String(formData.get("url") ?? "").trim() || null;
+  // Cash is the only kind that changes the shape of the row; anything else
+  // posted in is a gift like any other.
+  const kind: ItemKind = formData.get("kind") === "cash" ? "cash" : "thing";
+
+  const url = kind === "cash" ? null : String(formData.get("url") ?? "").trim() || null;
 
   const rawPrice = String(formData.get("price") ?? "").trim();
   const priceCents = rawPrice ? parsePriceToCents(rawPrice) : null;
@@ -50,10 +55,17 @@ export async function addGift(
     return { error: "That price didn't look like a number." };
   }
 
-  const quantity = Math.min(
-    Math.max(Number.parseInt(String(formData.get("quantity") ?? "1"), 10) || 1, 1),
-    20,
-  );
+  // Money has no quantity.
+  const quantity =
+    kind === "cash"
+      ? 1
+      : Math.min(
+          Math.max(
+            Number.parseInt(String(formData.get("quantity") ?? "1"), 10) || 1,
+            1,
+          ),
+          20,
+        );
 
   let images: string[] = [];
   try {
@@ -80,7 +92,11 @@ export async function addGift(
     .where(eq(items.listId, list.id))
     .get();
 
-  const isGroupGift = formData.get("isGroupGift") === "on";
+  // Stands in for a photo wherever there is none.
+  const emoji = parseGiftEmoji(formData.get("emoji"));
+
+  // Cash is always open to chipping in; there is nothing else to do with it.
+  const isGroupGift = kind === "cash" || formData.get("isGroupGift") === "on";
   const rawGoal = String(formData.get("goal") ?? "").trim();
   const parsedGoal = rawGoal ? parsePriceToCents(rawGoal) : null;
   if (isGroupGift && rawGoal && parsedGoal === null) {
@@ -90,11 +106,13 @@ export async function addGift(
   await db.insert(items).values({
     listId: list.id,
     position: (last?.max ?? -1) + 1,
+    kind,
     title,
     url,
     sourceDomain: sourceDomain(url),
     images,
     selectedImageIndex,
+    emoji,
     priceCents,
     currency: String(formData.get("currency") ?? "USD").toUpperCase(),
     quantity,
@@ -103,8 +121,11 @@ export async function addGift(
     isGroupGift,
     // A group gift aims at its own price unless the owner set a goal of their own.
     goalCents: isGroupGift ? (parsedGoal ?? priceCents) : null,
-    // Items with no photo get flagged so the editor can nudge about it.
-    needsAttention: images.length === 0 ? "no-photo" : null,
+    // Items with nothing to look at get flagged so the editor can nudge about
+    // it. An emoji counts: it is a deliberate choice, not a gap. Cash is never
+    // expected to have a photo, so it is never nagged about one.
+    needsAttention:
+      kind === "thing" && images.length === 0 && !emoji ? "no-photo" : null,
   });
 
   redirect(manageList(list, ownerHandle));

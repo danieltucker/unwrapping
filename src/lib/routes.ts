@@ -3,7 +3,7 @@
  *
  * A list lives at /lists/<handle>/<slug>. An unclaimed draft has no owner and
  * therefore no handle, so it uses the reserved `drafts` segment keyed by its
- * short code — which is globally unique, unlike a draft's slug.
+ * short code, which is globally unique, unlike a draft's slug.
  */
 
 export type ListRef = { slug: string; shortCode: string | null };

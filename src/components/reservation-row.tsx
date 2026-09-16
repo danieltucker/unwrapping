@@ -60,7 +60,7 @@ export function ReservationRow({
             come back to days later and the two lists may differ. */}
         {!reservation.listIsSurprise ? (
           <p className="mb-[7px] text-xs font-medium text-ink-62">
-            This list isn&rsquo;t a surprise — its owner can see the gift is taken,
+            This list isn&rsquo;t a surprise: its owner can see the gift is taken,
             never that it was you.
           </p>
         ) : null}

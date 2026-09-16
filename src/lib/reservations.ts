@@ -29,6 +29,14 @@ export type Reservation = {
   listKey: string;
 };
 
+export type DeliveryAddress = {
+  listName: string;
+  listEmoji: string;
+  /** First name only: it fronts a line of copy, not a formal record. */
+  ownerName: string | null;
+  address: string;
+};
+
 export type InvitedList = {
   name: string;
   emoji: string;
@@ -36,7 +44,7 @@ export type InvitedList = {
   freeCount: number;
 };
 
-/** Which claims belong to whoever is asking — see viewerScope. */
+/** Which claims belong to whoever is asking; see viewerScope. */
 async function mine(): Promise<SQL | null> {
   return viewerScope(claims.guestToken, claims.userId);
 }
@@ -59,12 +67,19 @@ export async function countGuestReservations(): Promise<number> {
 export async function getGuestReservations(): Promise<{
   reservations: Reservation[];
   invitedLists: InvitedList[];
+  addresses: DeliveryAddress[];
 }> {
   const scope = await mine();
-  if (!scope) return { reservations: [], invitedLists: [] };
+  if (!scope) return { reservations: [], invitedLists: [], addresses: [] };
 
   const rows = await db
-    .select({ claim: claims, item: items, list: lists, handle: users.handle })
+    .select({
+      claim: claims,
+      item: items,
+      list: lists,
+      handle: users.handle,
+      ownerName: users.name,
+    })
     .from(claims)
     .innerJoin(items, eq(items.id, claims.itemId))
     .innerJoin(lists, eq(lists.id, items.listId))
@@ -96,13 +111,24 @@ export async function getGuestReservations(): Promise<{
   });
 
   // The lists this person has touched, with how much is still unclaimed.
-  const seen = new Map<string, { name: string; emoji: string; path: string }>();
-  for (const { list, handle } of rows) {
+  const seen = new Map<
+    string,
+    {
+      name: string;
+      emoji: string;
+      path: string;
+      ownerName: string | null;
+      deliveryAddress: string | null;
+    }
+  >();
+  for (const { list, handle, ownerName } of rows) {
     if (!seen.has(list.id)) {
       seen.set(list.id, {
         name: list.name,
         emoji: list.emoji,
         path: publicList(list, handle),
+        ownerName,
+        deliveryAddress: list.deliveryAddress,
       });
     }
   }
@@ -122,13 +148,30 @@ export async function getGuestReservations(): Promise<{
       .where(eq(items.listId, listId))
       .get();
 
+    // Spelled out rather than spread: the map also carries the delivery address,
+    // and these cards are sent to the browser.
     invitedLists.push({
-      ...meta,
+      name: meta.name,
+      emoji: meta.emoji,
+      path: meta.path,
       freeCount: Math.max((counts?.units ?? 0) - (counts?.taken ?? 0), 0),
     });
   }
 
-  return { reservations, invitedLists };
+  // Only lists this person holds a live claim on; the rows above are already
+  // scoped to them, so releasing the last gift takes the address away again.
+  const addresses: DeliveryAddress[] = [];
+  for (const meta of seen.values()) {
+    if (!meta.deliveryAddress) continue;
+    addresses.push({
+      listName: meta.name,
+      listEmoji: meta.emoji,
+      ownerName: meta.ownerName?.trim().split(/\s+/)[0] || null,
+      address: meta.deliveryAddress,
+    });
+  }
+
+  return { reservations, invitedLists, addresses };
 }
 
 /** Flips the "I've bought this" flag, proving the claim belongs to the caller. */
@@ -166,7 +209,7 @@ export async function linkGuestClaimsToUser(
 /**
  * Ticks a gift off as bought from the list page itself, rather than from the
  * reservations page. Addressed by item, because that is what a gift card knows
- * — the caller's own live claim on it is what gets updated, and nobody else's.
+ * the caller's own live claim on it is what gets updated, and nobody else's.
  */
 export async function setItemBought(
   itemId: string,

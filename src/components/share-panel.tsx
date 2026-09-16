@@ -15,7 +15,7 @@ export function SharePanel({
   qrSvg,
 }: {
   shareUrl: string;
-  /** Where the short link lands — worth showing, since it isn't the same string. */
+  /** Where the short link lands; worth showing, since it isn't the same string. */
   canonical: string;
   qrSvg: string;
 }) {
@@ -45,7 +45,7 @@ export function SharePanel({
         <div className="flex flex-col justify-center gap-2 rounded-[12px] border border-ink-line bg-surface p-4">
           <p className="text-xs font-semibold text-ink-62">Invite by email</p>
           <p className="text-2xs leading-[1.5] text-ink-62">
-            Coming later — send the link yourself for now.
+            Coming later. Send the link yourself for now.
           </p>
         </div>
       </div>

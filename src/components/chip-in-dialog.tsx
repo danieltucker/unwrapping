@@ -6,7 +6,10 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { chipIn, type ChipInState } from "@/app/lists/[handle]/[slug]/actions";
 import { FundingBar } from "@/components/funding";
 import { fundingLine } from "@/lib/funding";
+import { Modal } from "@/components/modal";
+import { CopyButton } from "@/components/copy-button";
 import { GiftSummary } from "@/components/gift-summary";
+import { WalletIcon } from "@/components/ui";
 import { formatPrice, site } from "@/config/site";
 import type { PublicItem } from "@/lib/claims";
 import * as routes from "@/lib/routes";
@@ -47,18 +50,41 @@ export function ChipInDialog({
     ...(remaining !== null && remaining > 0 ? [remaining] : []),
   ].slice(0, 4);
 
+  // The outcome panel belongs to one submission, not to the component.
+  // useActionState holds its last result for as long as this dialog is
+  // mounted, so without something to say "that answer is old", chipping in
+  // once would leave "Chip in again" opening on the answer forever, with no
+  // way back to the amount field.
+  const [answered, setAnswered] = useState<ChipInState>(state);
+  const settled = state !== answered;
+
+  /** Back to an empty form, ready for another amount. */
+  function restart() {
+    setAnswered(state);
+    setAmount("");
+  }
+
   // Someone with an account has nothing to lose; close and get out of the way.
-  const offerAccount = Boolean(state.ok) && !signedIn;
+  const offerAccount = settled && Boolean(state.ok) && !signedIn;
+  // Cash the owner is expecting has to be sent somewhere, and this answer is
+  // the only place the details appear. Never close over the top of them.
+  const sendTo = settled ? (state.paymentDetails ?? null) : null;
+  const done = settled && Boolean(state.ok) && (offerAccount || sendTo !== null);
 
   useEffect(() => {
-    if (state.ok && signedIn) dialog.current?.close();
-  }, [state.ok, signedIn]);
+    if (state.ok && signedIn && !state.paymentDetails) dialog.current?.close();
+  }, [state.ok, signedIn, state.paymentDetails]);
 
   return (
     <>
       <button
         type="button"
-        onClick={() => dialog.current?.showModal()}
+        onClick={() => {
+          // Opening is always the start of a new chip-in, whatever the last
+          // one ended on.
+          restart();
+          dialog.current?.showModal();
+        }}
         className={
           alreadyGave
             ? "w-full rounded-pill border border-rose/40 py-3 text-sm font-semibold text-rose-dark transition-colors duration-150 hover:bg-rose-wash"
@@ -68,38 +94,83 @@ export function ChipInDialog({
         {alreadyGave ? "Chip in again" : "Chip in"}
       </button>
 
-      <dialog
-        ref={dialog}
-        aria-labelledby={`chip-in-heading-${item.id}`}
-        className="w-[min(29rem,calc(100vw-2rem))] rounded-card border border-ink-line bg-paper p-0 text-ink shadow-card backdrop:bg-ink/40"
-      >
-        {offerAccount ? (
+      <Modal dialogRef={dialog} labelledBy={`chip-in-heading-${item.id}`}>
+        {done ? (
           <div className="p-7">
-            <p className="mb-2 rounded-control bg-rose-wash px-3.5 py-2.5 text-xs font-semibold text-rose-dark">
+            <p className="mb-2 rounded-control bg-rose-wash py-2.5 pl-3.5 pr-12 text-xs font-semibold text-rose-dark">
               {state.amountCents !== undefined
                 ? `${formatPrice(state.amountCents)} counted toward this gift`
                 : "Counted toward this gift"}
             </p>
-            <h2 className="mb-2 font-display text-2xl leading-tight tracking-[-0.02em]">
-              Keep track of what you gave
-            </h2>
-            <p className="mb-5 text-sm leading-relaxed text-ink-76">
-              This chip-in is remembered in this browser only. An account keeps it
-              wherever you sign in — and the owner still only ever sees the total.
-            </p>
-            <Link
-              href={routes.signUp}
-              className="mb-2 block rounded-pill bg-violet py-3.5 text-center text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
-            >
-              Create an account
-            </Link>
+
             <button
               type="button"
-              onClick={() => dialog.current?.close()}
-              className="w-full text-center text-sm font-semibold text-ink-72"
+              onClick={restart}
+              className="mb-4 text-xs font-semibold text-rose-dark underline-offset-2 hover:underline"
             >
-              Not now
+              Put in more
             </button>
+
+            {sendTo ? (
+              <>
+                <h2 className="mb-2 font-display text-2xl leading-tight tracking-[-0.02em]">
+                  Now send it across
+                </h2>
+                <p className="mb-4 text-sm leading-relaxed text-ink-76">
+                  {site.name} doesn&rsquo;t handle the money, so this last bit is
+                  between you and them. They see the total go up, never that it
+                  was you.
+                </p>
+                <div className="mb-5 flex items-start gap-3 rounded-[0.75rem] border border-violet-edge bg-violet-wash px-4 py-[0.8125rem]">
+                  <WalletIcon size={17} className="mt-0.5 shrink-0 text-violet" />
+                  <p className="flex-1 whitespace-pre-line text-sm leading-relaxed text-ink">
+                    {sendTo}
+                  </p>
+                  <CopyButton
+                    value={sendTo}
+                    className="shrink-0 rounded-pill bg-ink px-[13px] py-1.5 text-2xs font-semibold text-paper transition-colors duration-150 hover:bg-ink/90"
+                  />
+                </div>
+                <p className="mb-5 text-xs leading-relaxed text-ink-62">
+                  It&rsquo;s on your reservations page too, if you&rsquo;d rather
+                  do it later.
+                </p>
+              </>
+            ) : null}
+
+            {offerAccount ? (
+              <>
+                <h2 className="mb-2 font-display text-2xl leading-tight tracking-[-0.02em]">
+                  Keep track of what you gave
+                </h2>
+                <p className="mb-5 text-sm leading-relaxed text-ink-76">
+                  This chip-in is remembered in this browser only. An account keeps
+                  it wherever you sign in, and the owner still only ever sees the
+                  total.
+                </p>
+                <Link
+                  href={routes.signUp}
+                  className="mb-2 block rounded-pill bg-violet py-3.5 text-center text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
+                >
+                  Create an account
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => dialog.current?.close()}
+                  className="w-full text-center text-sm font-semibold text-ink-72"
+                >
+                  Not now
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => dialog.current?.close()}
+                className="w-full rounded-pill bg-violet py-[14px] text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
+              >
+                Done
+              </button>
+            )}
           </div>
         ) : (
           <form action={action} className="p-7">
@@ -116,9 +187,9 @@ export function ChipInDialog({
               Chip in together
             </h2>
             <p className="mb-5 text-sm leading-[1.7] text-ink/78">
-              Any amount helps and nothing is wasted. Nothing is charged now — money
-              is only taken once the goal is met. The list owner sees the total and
-              never who gave it.
+              {item.kind === "cash"
+                ? `Any amount helps. ${site.name} doesn’t take the money; you send it to them directly, and we’ll show you how once you’ve put your amount in. The list owner sees the total and never who gave it.`
+                : "Any amount helps and nothing is wasted. Nothing is charged now; money is only taken once the goal is met. The list owner sees the total and never who gave it."}
             </p>
 
             {item.goalCents ? (
@@ -182,7 +253,7 @@ export function ChipInDialog({
                   className="rounded-pill border border-ink-line-strong bg-surface px-[13px] py-[6px] text-xs font-semibold text-ink-72 transition-colors duration-150 hover:bg-ink/[.03]"
                 >
                   {remaining !== null && value === remaining && value > 0
-                    ? `The rest — ${formatPrice(value)}`
+                    ? `The rest: ${formatPrice(value)}`
                     : formatPrice(value)}
                 </button>
               ))}
@@ -213,7 +284,7 @@ export function ChipInDialog({
             </button>
           </form>
         )}
-      </dialog>
+      </Modal>
     </>
   );
 }

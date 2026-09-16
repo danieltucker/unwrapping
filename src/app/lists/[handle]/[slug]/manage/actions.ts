@@ -16,7 +16,7 @@ export type ReorderState = { error?: string };
  *
  * The whole list is sent, not a move, so one dropped request can't leave two
  * gifts sharing a position. Ids that don't belong to this list are dropped and
- * a mismatched count is refused outright — the list changed underneath them.
+ * a mismatched count is refused outright, because the list changed underneath them.
  */
 export async function reorderGifts(
   handle: string,
@@ -53,7 +53,7 @@ export async function reorderGifts(
 export type ListDetailsState = { ok?: boolean; error?: string };
 
 /**
- * Edits what a list *is* — its name, emoji, date, note, and the two rules that
+ * Edits what a list *is*: its name, emoji, date, note, and the two rules that
  * govern it.
  *
  * The slug is deliberately left alone. A renamed list keeps the URL that has
@@ -77,6 +77,18 @@ export async function updateListDetails(
     return { error: "That date didn't look right." };
   }
 
+  // Enforced here as well as in the field: a browser is free to lie about maxLength.
+  const deliveryAddress =
+    String(formData.get("deliveryAddress") ?? "").trim() || null;
+  if (deliveryAddress && deliveryAddress.length > 400) {
+    return { error: "That address is longer than we can store." };
+  }
+
+  const paymentDetails = String(formData.get("paymentDetails") ?? "").trim() || null;
+  if (paymentDetails && paymentDetails.length > 400) {
+    return { error: "Those payment details are longer than we can store." };
+  }
+
   await db
     .update(lists)
     .set({
@@ -85,6 +97,8 @@ export async function updateListDetails(
       emoji: String(formData.get("emoji") ?? "").slice(0, 8) || list.emoji,
       eventDate,
       note: String(formData.get("note") ?? "").trim() || null,
+      deliveryAddress,
+      paymentDetails,
       claimRule: parseClaimRule(formData.get("claimRule")),
       surpriseMode: formData.get("surpriseMode") === "on",
     })

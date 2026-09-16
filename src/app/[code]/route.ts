@@ -27,7 +27,7 @@ export async function GET(request: Request, context: RouteContext<"/[code]">) {
 
   // The one number the owner gets about their guests, and the only place it is
   // counted: an open of the link they actually shared. Their own visits don't
-  // count, or the figure would mostly be them. It is a total and nothing else —
+  // count, or the figure would mostly be them. It is a total and nothing else:
   // never who opened it, never when, never which gift they went on to claim.
   if (!(await viewerOwns({ list: row.list, ownerHandle: row.handle }))) {
     await db

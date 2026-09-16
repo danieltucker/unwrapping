@@ -36,7 +36,7 @@ export async function generateMetadata({
  * On a surprise list it shows claim *counts* only, never which gifts are
  * claimed; on a list where the owner has turned surprise off, each row carries
  * its status so they can see what's left to cover. Both are enforced in the
- * data layer — see getPublicList and getOwnerItemStatus.
+ * data layer; see getPublicList and getOwnerItemStatus.
  */
 export default async function EditorPage({
   params,
@@ -71,6 +71,7 @@ export default async function EditorPage({
     id: gift.id,
     title: gift.title,
     image: gift.images[gift.selectedImageIndex] ?? gift.images[0] ?? null,
+    emoji: gift.emoji,
     sourceDomain: gift.sourceDomain,
     priceCents: gift.priceCents,
     quantity: gift.quantity,
@@ -101,15 +102,15 @@ export default async function EditorPage({
     prices.length
       ? `${formatPrice(Math.min(...prices))} – ${formatPrice(Math.max(...prices))}`
       : null,
-    ownerHandle ? null : "Draft — not saved to an account",
+    ownerHandle ? null : "Draft, not saved to an account",
   ].filter(Boolean);
 
   const hasGroupGift = gifts.some((gift) => gift.isGroupGift);
 
   const claimedLabel = list.surpriseMode
     ? stats.claimedCount === 1
-      ? "gift claimed — which one is hidden"
-      : "gifts claimed — which ones is hidden"
+      ? "gift claimed, which one is hidden"
+      : "gifts claimed, which ones is hidden"
     : stats.boughtCount > 0
       ? `${stats.claimedCount === 1 ? "gift claimed" : "gifts claimed"} · ${stats.boughtCount} bought`
       : stats.claimedCount === 1
@@ -143,6 +144,8 @@ export default async function EditorPage({
                 note: list.note ?? "",
                 claimRule: list.claimRule,
                 surpriseMode: list.surpriseMode,
+                deliveryAddress: list.deliveryAddress ?? "",
+                paymentDetails: list.paymentDetails ?? "",
               }}
             />
           </div>

@@ -17,7 +17,7 @@ const createdAt = () =>
     .notNull()
     .default(sql`(unixepoch())`);
 
-/** List owners. Guests never get a row here — they are identified by a cookie token. */
+/** List owners. Guests never get a row here; they are identified by a cookie token. */
 export const users = sqliteTable("users", {
   id: id(),
   // Appears in every public list URL: /lists/<handle>/<slug>
@@ -61,7 +61,7 @@ export const lists = sqliteTable(
     // Identifies the draft's creator by cookie until they have an account.
     draftToken: text("draft_token"),
     /**
-     * Unique per owner, not globally — two people may both have a "birthday"
+     * Unique per owner, not globally; two people may both have a "birthday"
      * list. Null owners (anonymous drafts) are exempt: SQLite treats NULLs as
      * distinct, and a draft is reachable by short code until it's claimed.
      */
@@ -81,6 +81,12 @@ export const lists = sqliteTable(
       .notNull()
       .default(true),
     deliveryAddress: text("delivery_address"),
+    /**
+     * How to send money for a cash gift: a payment link, a handle, or bank
+     * details. Held to the same rule as the address above; it reaches only
+     * someone who has already chipped in.
+     */
+    paymentDetails: text("payment_details"),
     // Owner-visible aggregate. Never broken down per item or per guest.
     linkOpens: integer("link_opens").notNull().default(0),
     sharedAt: integer("shared_at", { mode: "timestamp" }),
@@ -93,6 +99,14 @@ export const lists = sqliteTable(
   ],
 );
 
+/**
+ * "cash" is an ask for money rather than an object: no link, no photo and no
+ * quantity. It is stored as a group gift in every other respect, so the
+ * funding code needs no second path through it.
+ */
+export const ITEM_KINDS = ["thing", "cash"] as const;
+export type ItemKind = (typeof ITEM_KINDS)[number];
+
 export const items = sqliteTable(
   "items",
   {
@@ -102,6 +116,7 @@ export const items = sqliteTable(
       .references(() => lists.id, { onDelete: "cascade" }),
     // Explicit ordering, persisted so drag-to-reorder survives a reload.
     position: integer("position").notNull().default(0),
+    kind: text("kind", { enum: ITEM_KINDS }).notNull().default("thing"),
     title: text("title").notNull(),
     url: text("url"),
     sourceDomain: text("source_domain"),
@@ -111,7 +126,12 @@ export const items = sqliteTable(
       .notNull()
       .default(sql`'[]'`),
     selectedImageIndex: integer("selected_image_index").notNull().default(0),
-    /** Integer cents. Null when the scrape found no price — never guessed. */
+    /**
+     * Stands in for a photo wherever there isn't one. Gifts written in by hand
+     * rarely have a picture, and an emoji reads better than "No photo".
+     */
+    emoji: text("emoji"),
+    /** Integer cents. Null when the scrape found no price, never guessed. */
     priceCents: integer("price_cents"),
     currency: text("currency").notNull().default("USD"),
     quantity: integer("quantity").notNull().default(1),
@@ -124,7 +144,7 @@ export const items = sqliteTable(
       .notNull()
       .default(false),
     goalCents: integer("goal_cents"),
-    /** Dead link or missing photo — drives the amber row in the editor. */
+    /** Dead link or missing photo; drives the amber row in the editor. */
     needsAttention: text("needs_attention"),
     createdAt: createdAt(),
   },

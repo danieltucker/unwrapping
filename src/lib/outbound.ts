@@ -46,7 +46,7 @@ export function outboundHref(
   return parsed.toString();
 }
 
-/** True once any referral programme is configured — drives the disclosure line. */
+/** True once any referral programme is configured; drives the disclosure line. */
 export function hasReferralTags(): boolean {
   return Object.keys(REFERRAL_TAGS).length > 0;
 }

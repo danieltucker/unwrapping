@@ -17,7 +17,7 @@ const GUEST_DAYS = 400; // Chrome's cap; the guest's reservations should outlive
 function secret(): string {
   const value = process.env.SESSION_SECRET;
   if (!value) {
-    throw new Error("SESSION_SECRET is not set — see .env.local");
+    throw new Error("SESSION_SECRET is not set; see .env.local");
   }
   return value;
 }
@@ -85,7 +85,7 @@ export async function destroySession(): Promise<void> {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Guest identity — no account, just a signed cookie                          */
+/* Guest identity: no account, just a signed cookie                           */
 /* -------------------------------------------------------------------------- */
 
 function sign(value: string): string {
@@ -106,7 +106,7 @@ function verify(signed: string): string | null {
 
 /**
  * Identifies the creator of an anonymous list before they have an account,
- * so the draft can be claimed at sign-up. Server Actions only — it sets a cookie.
+ * so the draft can be claimed at sign-up. Server Actions only; it sets a cookie.
  */
 export async function ensureDraftToken(): Promise<string> {
   const store = await cookies();
@@ -137,7 +137,7 @@ export const readGuestToken = cache(async (): Promise<string | null> => {
 
 /**
  * Issues a guest token if there isn't one. Only call this from a Server Action
- * or Route Handler — cookies cannot be set while rendering a page.
+ * or Route Handler; cookies cannot be set while rendering a page.
  */
 export async function ensureGuestToken(): Promise<string> {
   const existing = await readGuestToken();

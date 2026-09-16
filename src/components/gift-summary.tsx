@@ -9,12 +9,22 @@ export function GiftSummary({ item }: { item: PublicItem }) {
         {item.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={item.image} alt="" className="h-full w-full object-cover" />
+        ) : item.emoji ? (
+          <span className="flex h-full items-center justify-center text-[2rem] leading-none">
+            {item.emoji}
+          </span>
         ) : null}
       </div>
-      <div>
+      <div className="pr-10">
         <p className="mb-1 text-base font-semibold leading-[1.3]">{item.title}</p>
         <p className="text-sm font-medium text-ink-72">
-          {item.priceCents !== null ? formatPrice(item.priceCents) : "No price"}
+          {item.kind === "cash"
+            ? item.goalCents !== null
+              ? `${formatPrice(item.goalCents)} target`
+              : "Cash gift"
+            : item.priceCents !== null
+              ? formatPrice(item.priceCents)
+              : "No price"}
           {item.sourceDomain ? ` · ${item.sourceDomain}` : ""}
         </p>
       </div>

@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ContributionRow } from "@/components/contribution-row";
+import { DeliveryAddressPanel } from "@/components/delivery-address-panel";
+import {
+  PaymentDetailsPanel,
+  type PaymentDetails,
+} from "@/components/payment-details-panel";
 import { ReservationRow } from "@/components/reservation-row";
 import { SavePrompt } from "@/components/save-prompt";
 import { EyeOffIcon } from "@/components/ui";
@@ -17,15 +22,33 @@ export const metadata: Metadata = {
 };
 
 export default async function ReservedPage() {
-  const [{ reservations, invitedLists }, contributions, user] = await Promise.all([
-    getGuestReservations(),
-    getGuestContributions(),
-    getCurrentUser(),
-  ]);
+  const [{ reservations, invitedLists, addresses }, contributions, user] =
+    await Promise.all([
+      getGuestReservations(),
+      getGuestContributions(),
+      getCurrentUser(),
+    ]);
 
   /** The caps line above a row: which list, and when the event is. */
   const eventLine = (name: string, date: Date | null) =>
     [name, formatEventDate(date)].filter(Boolean).join(" · ");
+
+  // One line per list, however many cash gifts on it were chipped in on.
+  const payments = [
+    ...new Map<string, PaymentDetails>(
+      contributions
+        .filter((c) => c.paymentDetails !== null)
+        .map((c) => [
+          c.listPath,
+          {
+            listName: c.listName,
+            listEmoji: c.listEmoji,
+            ownerName: c.ownerName,
+            details: c.paymentDetails as string,
+          },
+        ]),
+    ).values(),
+  ];
 
   const nothingYet = reservations.length === 0 && contributions.length === 0;
 
@@ -89,6 +112,13 @@ export default async function ReservedPage() {
                 ))}
               </ul>
             </section>
+          ) : null}
+
+          {/* Both sit with what they belong to, above the general promise. */}
+          {payments.length > 0 ? <PaymentDetailsPanel payments={payments} /> : null}
+
+          {addresses.length > 0 ? (
+            <DeliveryAddressPanel addresses={addresses} />
           ) : null}
 
           <div className="mb-7 flex items-center gap-3 rounded-[0.75rem] border border-violet-edge bg-violet-wash px-4 py-3">

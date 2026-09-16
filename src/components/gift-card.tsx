@@ -66,6 +66,10 @@ export function GiftCard({
             className="h-full w-full object-cover"
             loading="lazy"
           />
+        ) : item.emoji ? (
+          <span className="flex h-full items-center justify-center text-[5rem] leading-none">
+            {item.emoji}
+          </span>
         ) : (
           <span className="flex h-full items-center justify-center px-6 text-center text-xs text-ink-62">
             No photo for this one
@@ -169,7 +173,7 @@ function Body({
 }) {
   if (takenByAnother) return <>{visibility(surpriseMode).taken}</>;
   if (funded) {
-    return <>Fully funded. Nothing more is needed — and the owner only sees a total.</>;
+    return <>Fully funded. Nothing more is needed, and the owner only sees a total.</>;
   }
   if (item.reason) return <>{item.reason}</>;
   if (item.isGroupGift) return <>Any amount helps and nothing is wasted.</>;
@@ -270,6 +274,7 @@ function Action({
           handle={handle}
           listKey={listKey}
           bought={item.boughtByViewer}
+          deliveryAddress={item.deliveryAddress}
           size="sm"
           className=""
         />

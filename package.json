@@ -10,7 +10,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "typecheck": "tsc --noEmit",
-    "test:parse": "node scripts/test-parse.mts"
+    "test": "npm run test:parse && npm run test:handles",
+    "test:parse": "node scripts/test-parse.mts",
+    "test:handles": "node scripts/test-handles.mts",
+    "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

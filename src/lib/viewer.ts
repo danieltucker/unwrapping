@@ -12,7 +12,7 @@ import { getCurrentUser, readGuestToken } from "@/lib/session";
  * the person rather than the browser.
  *
  * Returns null when this visitor has neither identity. A caller must read that
- * as "they have nothing" and skip the query — never as "no filter".
+ * as "they have nothing" and skip the query, never as "no filter".
  */
 export async function viewerScope(
   guestTokenColumn: AnyColumn,

@@ -11,8 +11,10 @@ import {
 } from "@/app/lists/[handle]/[slug]/actions";
 import Link from "next/link";
 
+import { CopyButton } from "@/components/copy-button";
 import { GiftSummary } from "@/components/gift-summary";
-import { Button } from "@/components/ui";
+import { Modal } from "@/components/modal";
+import { BoxIcon, Button } from "@/components/ui";
 import type { PublicItem } from "@/lib/claims";
 import { visibility } from "@/lib/visibility";
 import * as routes from "@/lib/routes";
@@ -62,23 +64,18 @@ export function ReserveDialog({
         I&rsquo;ll get this one
       </button>
 
-      {/* <dialog> gives focus trapping and Escape-to-dismiss for free. */}
-      <dialog
-        ref={dialog}
-        aria-labelledby={`reserve-heading-${item.id}`}
-        className="w-[min(29rem,calc(100vw-2rem))] rounded-card border border-ink-line bg-paper p-0 text-ink shadow-card backdrop:bg-ink/40"
-      >
+      <Modal dialogRef={dialog} labelledBy={`reserve-heading-${item.id}`}>
         {offerAccount ? (
           <div className="p-7">
-            <p className="mb-2 rounded-control bg-pine-wash px-3.5 py-2.5 text-xs font-semibold text-pine-dark">
-              ✓ Reserved — it now shows as taken to other guests
+            <p className="mb-2 rounded-control bg-pine-wash py-2.5 pl-3.5 pr-12 text-xs font-semibold text-pine-dark">
+              ✓ Reserved. It now shows as taken to other guests
             </p>
             <h2 className="mb-2 font-display text-2xl leading-tight tracking-[-0.02em]">
               Don&rsquo;t lose track of it
             </h2>
             <p className="mb-5 text-sm leading-relaxed text-ink-76">
               This reservation is remembered in this browser only. An account keeps
-              it wherever you sign in — and the owner still won&rsquo;t see who
+              it wherever you sign in, and the owner still won&rsquo;t see who
               reserved what.
             </p>
             <Link
@@ -119,7 +116,7 @@ export function ReserveDialog({
                 htmlFor={`first-name-${item.id}`}
                 className="mb-[7px] block text-2xs font-semibold uppercase tracking-[.9px] text-ink-66"
               >
-                First name — so guests can coordinate
+                First name, so guests can coordinate
               </label>
               <input
                 id={`first-name-${item.id}`}
@@ -156,7 +153,7 @@ export function ReserveDialog({
           </button>
           </form>
         )}
-      </dialog>
+      </Modal>
     </>
   );
 }
@@ -213,12 +210,18 @@ export function ReleaseButton({
  *
  * On a surprise list this changes nothing the owner can see; on a list where
  * surprise is off it is how they know a gift is actually handled.
+ *
+ * Having just bought something is the moment you need somewhere to send it, so
+ * a list with a delivery address hands it over here rather than making anyone
+ * go looking. `deliveryAddress` is null unless the viewer holds this claim:
+ * see PublicItem.
  */
 export function BoughtButton({
   itemId,
   handle,
   listKey,
   bought,
+  deliveryAddress = null,
   size = "md",
   className = "w-full",
 }: {
@@ -226,6 +229,7 @@ export function BoughtButton({
   handle: string;
   listKey: string;
   bought: boolean;
+  deliveryAddress?: string | null;
   size?: "sm" | "md";
   className?: string;
 }) {
@@ -233,27 +237,80 @@ export function BoughtButton({
     markGiftBought,
     {},
   );
+  const dialog = useRef<HTMLDialogElement>(null);
+  // The same button un-marks a bought gift, and that way round has nothing to
+  // say. Read at click time, because the prop flips under us on revalidation.
+  const marking = useRef(false);
+
+  useEffect(() => {
+    if (state.ok && marking.current && deliveryAddress) {
+      dialog.current?.showModal();
+    }
+    marking.current = false;
+  }, [state, deliveryAddress]);
 
   return (
-    <form action={action} className={className}>
-      <input type="hidden" name="handle" value={handle} />
-      <input type="hidden" name="key" value={listKey} />
-      <input type="hidden" name="itemId" value={itemId} />
-      <input type="hidden" name="bought" value={String(!bought)} />
-      <Button
-        type="submit"
-        variant={bought ? "outline" : "dark"}
-        size={size}
-        disabled={pending}
-        className={`w-full ${bought ? "text-pine-dark" : ""}`}
-      >
-        {bought ? "✓ Bought" : "Mark as bought"}
-      </Button>
-      {state.error ? (
-        <p role="alert" className="mt-2 text-xs text-rose-dark">
-          {state.error}
-        </p>
+    <>
+      <form action={action} className={className}>
+        <input type="hidden" name="handle" value={handle} />
+        <input type="hidden" name="key" value={listKey} />
+        <input type="hidden" name="itemId" value={itemId} />
+        <input type="hidden" name="bought" value={String(!bought)} />
+        <Button
+          type="submit"
+          variant={bought ? "outline" : "dark"}
+          size={size}
+          disabled={pending}
+          onClick={() => {
+            marking.current = !bought;
+          }}
+          className={`w-full ${bought ? "text-pine-dark" : ""}`}
+        >
+          {bought ? "✓ Bought" : "Mark as bought"}
+        </Button>
+        {state.error ? (
+          <p role="alert" className="mt-2 text-xs text-rose-dark">
+            {state.error}
+          </p>
+        ) : null}
+      </form>
+
+      {deliveryAddress ? (
+        <Modal dialogRef={dialog} labelledBy={`send-heading-${itemId}`}>
+          <div className="p-7">
+            <p className="mb-4 rounded-control bg-pine-wash py-2.5 pl-3.5 pr-12 text-xs font-semibold text-pine-dark">
+              ✓ Marked as bought
+            </p>
+
+            <h2
+              id={`send-heading-${itemId}`}
+              className="mb-2 font-display text-[1.75rem] leading-[1.1] tracking-[-.7px]"
+            >
+              Sending it directly?
+            </h2>
+            <p className="mb-5 text-sm leading-[1.7] text-ink/78">
+              This list has a delivery address. Nobody is told you asked for it,
+              and it stays on your reservations page if you need it again.
+            </p>
+
+            <div className="mb-5 flex items-start gap-3 rounded-[0.75rem] border border-violet-edge bg-violet-wash px-4 py-[0.8125rem]">
+              <BoxIcon size={17} className="mt-0.5 shrink-0 text-violet" />
+              <address className="flex-1 whitespace-pre-line text-sm not-italic leading-relaxed text-ink">
+                {deliveryAddress}
+              </address>
+              <CopyButton value={deliveryAddress} className="shrink-0 rounded-pill bg-ink px-[13px] py-1.5 text-2xs font-semibold text-paper transition-colors duration-150 hover:bg-ink/90" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => dialog.current?.close()}
+              className="w-full rounded-pill bg-violet py-[14px] text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
+            >
+              Done
+            </button>
+          </div>
+        </Modal>
       ) : null}
-    </form>
+    </>
   );
 }

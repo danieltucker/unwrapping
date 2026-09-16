@@ -13,7 +13,7 @@ export type ScrapeResult = {
   url: string;
   sourceDomain: string | null;
   title: string | null;
-  /** Integer cents, or null. A price is never guessed — blank beats wrong. */
+  /** Integer cents, or null. A price is never guessed; blank beats wrong. */
   priceCents: number | null;
   currency: string | null;
   images: string[];

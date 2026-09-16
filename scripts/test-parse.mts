@@ -4,7 +4,7 @@
  *   node scripts/test-parse.mts [path/to/saved-page.html]
  *
  * Node strips the types, so there's no build step. Pass a saved product page to
- * also check extraction against real markup — retailers change their HTML
+ * also check extraction against real markup; retailers change their HTML
  * without warning, and a scraper fails silently when they do.
  */
 import { readFileSync } from "node:fs";

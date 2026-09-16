@@ -3,7 +3,13 @@ import "server-only";
 import { and, eq, isNull, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { contributions, items, lists, users } from "@/db/schema";
+import {
+  contributions,
+  items,
+  lists,
+  users,
+  type ItemKind,
+} from "@/db/schema";
 import { outboundHref } from "@/lib/outbound";
 import { publicList } from "@/lib/routes";
 import { viewerScope } from "@/lib/viewer";
@@ -13,7 +19,7 @@ import { viewerScope } from "@/lib/viewer";
  *
  * No money moves yet: a contribution is authorised in the UI and stored as
  * `pending`. The design only captures when the goal is met, so nothing here
- * charges anyone — but the amounts are real and the totals are what both the
+ * charges anyone, but the amounts are real and the totals are what both the
  * guest and the owner are shown.
  *
  * The owner sees the total raised and nothing else. Who contributed is held to
@@ -78,7 +84,7 @@ export async function raisedForList(listId: string): Promise<number> {
  * Records a chip-in.
  *
  * Unlike a claim there is nothing exclusive to win here, so two people
- * contributing at the same moment need no atomic guard — both amounts count.
+ * contributing at the same moment need no atomic guard; both amounts count.
  * The one thing refused is money toward a goal already met.
  */
 export async function contributeToItem(
@@ -104,11 +110,12 @@ export async function contributeToItem(
 
 export type GuestContribution = {
   itemId: string;
+  kind: ItemKind;
   title: string;
   image: string | null;
   href: string | null;
   sourceDomain: string | null;
-  /** Everything this person has put in, summed — they may have chipped in twice. */
+  /** Everything this person has put in, summed; they may have chipped in twice. */
   yourAmountCents: number;
   raisedCents: number;
   goalCents: number | null;
@@ -117,6 +124,13 @@ export type GuestContribution = {
   listEmoji: string;
   eventDate: Date | null;
   listPath: string;
+  /** First name only, to front a line of copy. */
+  ownerName: string | null;
+  /**
+   * How to send the money, for a cash gift. Reaching this row at all means
+   * this person has chipped in, which is exactly who it is for.
+   */
+  paymentDetails: string | null;
 };
 
 /** The group gifts this visitor has chipped in toward, for their own page. */
@@ -131,6 +145,7 @@ export async function getGuestContributions(): Promise<GuestContribution[]> {
       item: items,
       list: lists,
       handle: users.handle,
+      ownerName: users.name,
     })
     .from(contributions)
     .innerJoin(items, eq(items.id, contributions.itemId))
@@ -142,7 +157,7 @@ export async function getGuestContributions(): Promise<GuestContribution[]> {
   // Several chip-ins toward the same gift read as one line, not a payment log.
   const byItem = new Map<string, GuestContribution>();
 
-  for (const { amountCents, createdAt, item, list, handle } of rows) {
+  for (const { amountCents, createdAt, item, list, handle, ownerName } of rows) {
     const existing = byItem.get(item.id);
 
     if (existing) {
@@ -153,6 +168,7 @@ export async function getGuestContributions(): Promise<GuestContribution[]> {
 
     byItem.set(item.id, {
       itemId: item.id,
+      kind: item.kind,
       title: item.title,
       image: item.images[item.selectedImageIndex] ?? item.images[0] ?? null,
       href: outboundHref(item.url),
@@ -165,6 +181,10 @@ export async function getGuestContributions(): Promise<GuestContribution[]> {
       listEmoji: list.emoji,
       eventDate: list.eventDate,
       listPath: publicList(list, handle),
+      ownerName: ownerName?.split(" ")[0] ?? null,
+      // Only a cash gift has money to send; a group gift toward an object is
+      // still someone buying the object.
+      paymentDetails: item.kind === "cash" ? list.paymentDetails : null,
     });
   }
 

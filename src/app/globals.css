@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Design tokens — see design_handoff_wishly/README.md.
+/* Design tokens, see design_handoff_wishly/README.md.
    The design deliberately commits to one light look; there is no dark theme. */
 @theme {
   --color-ink: #17112b;
@@ -39,7 +39,7 @@
   --color-paper-fill: rgba(250, 248, 245, 0.1);
   --color-paper-line: rgba(250, 248, 245, 0.16);
 
-  /* Lighter status variants — legible on ink only, never on paper */
+  /* Lighter status variants: legible on ink only, never on paper */
   --color-violet-on-ink: #8a72ff;
   --color-rose-on-ink: #e85a93;
   --color-pine-on-ink: #3fbfa1;
@@ -86,7 +86,7 @@
   }
 
   /* Tailwind's preflight sets margin:0 on every element, which overrides the
-     browser's own `margin: auto` on <dialog> — a modal then pins to the top
+     browser's own `margin: auto` on <dialog>, so a modal then pins to the top
      left instead of centring. Restore it, and keep a tall dialog scrollable
      rather than letting it run off a short screen. */
   dialog {

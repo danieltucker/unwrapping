@@ -48,7 +48,7 @@ export function ContributionRow({
         <p className="mb-[9px] text-base font-semibold">
           {contribution.title}
           <span className="font-normal text-ink-72">
-            {" — you chipped in "}
+            {", you chipped in "}
             {formatPrice(contribution.yourAmountCents)}
           </span>
         </p>

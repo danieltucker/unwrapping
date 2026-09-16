@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 
-import { CapsLabel, EyeOffIcon, Input, Textarea } from "@/components/ui";
+import {
+  BoxIcon,
+  CapsLabel,
+  EyeOffIcon,
+  Input,
+  Textarea,
+  WalletIcon,
+} from "@/components/ui";
 import { CLAIM_RULE_OPTIONS } from "@/lib/claim-rules";
 import type { ClaimRule } from "@/db/schema";
 import { matchedPhrase, suggestEmoji } from "@/lib/emoji";
@@ -136,7 +143,7 @@ export function ListIdentityFields({
           <CapsLabel className="mb-[7px]">
             Note to guests{" "}
             <span className="font-normal normal-case tracking-normal text-ink-62">
-              — optional
+              (optional)
             </span>
           </CapsLabel>
         </label>
@@ -146,7 +153,7 @@ export function ListIdentityFields({
           rows={2}
           maxLength={400}
           defaultValue={defaultNote}
-          placeholder="No pressure at all — but if you're the gift-giving type, here's what I'd actually use."
+          placeholder="No pressure at all, but if you're the gift-giving type, here's what I'd actually use."
         />
       </div>
     </>
@@ -210,7 +217,7 @@ export function SurpriseChoice({ defaultOn = true }: { defaultOn?: boolean }) {
           <span className="block text-sm font-semibold">Keep it a surprise</span>
           <span className="block text-xs leading-[1.55] text-ink-72">
             {on
-              ? "You'll only ever see counts — never which gifts are taken, or who took them."
+              ? "You'll only ever see counts, never which gifts are taken, or who took them."
               : "You'll see which gifts are taken, so you can add more. Guests are told, and who took what still stays private."}
           </span>
         </span>
@@ -222,6 +229,90 @@ export function SurpriseChoice({ defaultOn = true }: { defaultOn?: boolean }) {
           className="mt-[3px] h-4 w-4 shrink-0 accent-violet"
         />
       </label>
+    </div>
+  );
+}
+
+/**
+ * Where a gift can be posted.
+ *
+ * Optional, and shown to a narrow audience: only someone who has actually
+ * reserved a gift from this list, and only on their own reservations page.
+ * That keeps a home address off a URL anybody can open, which is the whole
+ * reason it isn't just part of the note to guests.
+ */
+export function DeliveryAddressField({
+  defaultValue = "",
+}: {
+  defaultValue?: string;
+}) {
+  return (
+    <div className="mb-6">
+      <label htmlFor="deliveryAddress">
+        <CapsLabel className="mb-[7px]">
+          Delivery address{" "}
+          <span className="font-normal normal-case tracking-normal text-ink-62">
+            (optional)
+          </span>
+        </CapsLabel>
+      </label>
+      <Textarea
+        id="deliveryAddress"
+        name="deliveryAddress"
+        rows={3}
+        maxLength={400}
+        defaultValue={defaultValue}
+        placeholder={"Maya Ferrand\n14 Bellwether Lane\nAustin, TX 78704"}
+      />
+      <p className="mt-[7px] flex gap-2 text-xs leading-[1.55] text-ink-72">
+        <BoxIcon size={15} className="mt-px shrink-0 text-ink-62" />
+        <span>
+          Only shown to guests who have reserved a gift, on their own
+          reservations page. It never appears on the shared list, and seeing it
+          doesn&rsquo;t tell you who looked.
+        </span>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Where a cash gift's money actually goes.
+ *
+ * Unwrap moves no money, so without this a guest who has chipped in has no way
+ * to finish the job. Same rule as the delivery address: it reaches only
+ * someone who has already given, never the public list.
+ */
+export function PaymentDetailsField({
+  defaultValue = "",
+}: {
+  defaultValue?: string;
+}) {
+  return (
+    <div className="mb-6">
+      <label htmlFor="paymentDetails">
+        <CapsLabel className="mb-[7px]">
+          How to send money{" "}
+          <span className="font-normal normal-case tracking-normal text-ink-62">
+            (optional)
+          </span>
+        </CapsLabel>
+      </label>
+      <Textarea
+        id="paymentDetails"
+        name="paymentDetails"
+        rows={3}
+        maxLength={400}
+        defaultValue={defaultValue}
+        placeholder={"monzo.me/mayaferrand\nor: Maya Ferrand, 04-00-04, 12345678"}
+      />
+      <p className="mt-[7px] flex gap-2 text-xs leading-[1.55] text-ink-72">
+        <WalletIcon size={15} className="mt-px shrink-0 text-ink-62" />
+        <span>
+          Shown to guests who chip in on a cash gift, so they can send it. You
+          still only ever see the total, never who gave what.
+        </span>
+      </p>
     </div>
   );
 }

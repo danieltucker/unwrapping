@@ -19,7 +19,7 @@ const globalForDb = globalThis as unknown as {
 
 function connect() {
   const sqlite = new Database(file);
-  // WAL lets readers continue during a write — needed once several guests
+  // WAL lets readers continue during a write; needed once several guests
   // are claiming at once.
   sqlite.pragma("journal_mode = WAL");
   // SQLite leaves foreign keys off by default; our cascades depend on them.

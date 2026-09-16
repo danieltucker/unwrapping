@@ -1,6 +1,6 @@
 import { site } from "@/config/site";
 
-/** "Saturday 14 November" — the caps line above a list headline. */
+/** "Saturday 14 November": the caps line above a list headline. */
 export function formatEventDate(date: Date | null): string | null {
   if (!date) return null;
   return new Intl.DateTimeFormat(site.locale, {
@@ -26,7 +26,7 @@ export function relativeEvent(date: Date | null): string | null {
   return `${weeks} weeks away`;
 }
 
-/** "16 September" — for lines where the weekday would be noise. */
+/** "16 September": for lines where the weekday would be noise. */
 export function formatShortDate(date: Date): string {
   return new Intl.DateTimeFormat(site.locale, {
     day: "numeric",
@@ -36,7 +36,7 @@ export function formatShortDate(date: Date): string {
 
 /**
  * A Date as an <input type="date"> value. Event dates are stored at local
- * midnight, so they're read back in local time rather than UTC — otherwise a
+ * midnight, so they're read back in local time rather than UTC; otherwise a
  * list west of Greenwich shows the day before.
  */
 export function toDateInput(date: Date | null): string {

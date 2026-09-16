@@ -5,7 +5,7 @@ import { formatPrice, listUrl, site } from "@/config/site";
 import * as routes from "@/lib/routes";
 
 /**
- * Screen 01 — the landing page. Its whole job is to turn a first-time visitor
+ * Screen 01: the landing page. Its whole job is to turn a first-time visitor
  * into a list, so there is exactly one destination: /new.
  *
  * The hero is two full-bleed panels rather than a centred column: the left
@@ -84,7 +84,7 @@ function Stat({ figure, label }: { figure: string; label: string }) {
 
 /**
  * The ink half: a list as a guest would see it, with the promise underneath.
- * Everything here is illustration — it is the only list in the product that
+ * Everything here is illustration; it is the only list in the product that
  * nobody owns, so it is written out literally rather than queried.
  */
 function ListPreview() {

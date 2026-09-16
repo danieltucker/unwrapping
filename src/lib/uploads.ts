@@ -55,7 +55,7 @@ export type UploadResult = { url: string } | { error: string };
 export async function saveUpload(file: File): Promise<UploadResult> {
   if (file.size === 0) return { error: "That file was empty." };
   if (file.size > MAX_BYTES) {
-    return { error: "That image is larger than 8MB — try a smaller one." };
+    return { error: "That image is larger than 8MB. Try a smaller one." };
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());

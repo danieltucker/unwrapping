@@ -43,7 +43,7 @@ export async function createList(
   const draftToken = user ? null : await ensureDraftToken();
 
   // Every list gets a short share code at birth, so there is always something
-  // to paste into a message — including drafts with no owner in their URL yet.
+  // to paste into a message, including drafts with no owner in their URL yet.
   const shortCode = await uniqueShortCode(async (candidate) => {
     const row = await db
       .select({ id: lists.id })

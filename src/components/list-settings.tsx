@@ -8,9 +8,12 @@ import {
 } from "@/app/lists/[handle]/[slug]/manage/actions";
 import {
   ClaimRuleFields,
+  DeliveryAddressField,
+  PaymentDetailsField,
   ListIdentityFields,
   SurpriseChoice,
 } from "@/components/list-fields";
+import { Modal } from "@/components/modal";
 import { Button, PencilIcon } from "@/components/ui";
 import type { ClaimRule } from "@/db/schema";
 
@@ -22,6 +25,8 @@ export type ListDetails = {
   note: string;
   claimRule: ClaimRule;
   surpriseMode: boolean;
+  deliveryAddress: string;
+  paymentDetails: string;
 };
 
 export function ListSettings({
@@ -57,11 +62,7 @@ export function ListSettings({
         <PencilIcon />
       </button>
 
-      <dialog
-        ref={dialog}
-        aria-labelledby="list-details-heading"
-        className="w-[min(34rem,calc(100vw-2rem))] rounded-card border border-ink-line bg-paper p-0 text-ink shadow-card backdrop:bg-ink/40"
-      >
+      <Modal dialogRef={dialog} size="lg" labelledBy="list-details-heading">
         {/* Keyed on the save, so the fields pick up whatever came back rather
             than holding the values that were just submitted. */}
         <form action={action} className="p-7" key={String(state.ok)}>
@@ -85,6 +86,8 @@ export function ListSettings({
             defaultEventDate={details.eventDate}
             defaultNote={details.note}
           />
+          <DeliveryAddressField defaultValue={details.deliveryAddress} />
+          <PaymentDetailsField defaultValue={details.paymentDetails} />
           <ClaimRuleFields value={details.claimRule} />
           <SurpriseChoice defaultOn={details.surpriseMode} />
 
@@ -110,7 +113,7 @@ export function ListSettings({
             </Button>
           </div>
         </form>
-      </dialog>
+      </Modal>
     </>
   );
 }

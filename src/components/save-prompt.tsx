@@ -7,7 +7,7 @@ import * as routes from "@/lib/routes";
  *
  * The claim it makes has to be true: both are tied to a cookie in one browser,
  * and an account is what lifts them off it. See the userId columns on claims and
- * contributions — signing up links this browser's rows to the account.
+ * contributions; signing up links this browser's rows to the account.
  */
 export function SavePrompt() {
   return (
@@ -35,7 +35,7 @@ export function SavePrompt() {
         </Link>
       </div>
       <p className="mt-3 text-xs text-ink-62">
-        The list owner still won&rsquo;t see what you reserved or what you gave — an
+        The list owner still won&rsquo;t see what you reserved or what you gave, and an
         account doesn&rsquo;t change that.
       </p>
     </aside>

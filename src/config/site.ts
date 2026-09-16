@@ -1,13 +1,13 @@
 /**
  * Product identity lives here and nowhere else, so renaming is a one-file change.
- * The name is still provisional — see README.
+ * The name is still provisional; see README.
  */
 export const site = {
   name: "Unwrap",
   domain: "unwrapp.ing",
   tagline: "A gift list people actually use.",
   description:
-    "Paste a link from any shop and we fill in the photo, title and price. Share one link. Guests claim what they're buying, so nobody doubles up — and you never find out who chose what.",
+    "Paste a link from any shop and we fill in the photo, title and price. Share one link. Guests claim what they're buying, so nobody doubles up, and you never find out who chose what.",
   currency: "USD",
   locale: "en-US",
 } as const;

@@ -12,6 +12,7 @@ export type EditorRow = {
   id: string;
   title: string;
   image: string | null;
+  emoji: string | null;
   sourceDomain: string | null;
   priceCents: number | null;
   quantity: number;
@@ -47,8 +48,8 @@ const FILTER_LABELS: Record<Filter, string> = {
  * The editor's gift list: filters over what's loaded, and drag-to-reorder that
  * persists an explicit position.
  *
- * The rows shuffle under the cursor as you drag — the order on screen is the
- * order that will be saved — and the write happens once, when the drag ends.
+ * The rows shuffle under the cursor as you drag: the order on screen is the
+ * order that will be saved, and the write happens once, when the drag ends.
  *
  * Reordering is only offered on the unfiltered list: dragging one row past a
  * hidden one has no meaning the owner could predict.
@@ -69,8 +70,8 @@ export function GiftRows({
 
   // Held as a string so a fresh server order is trivial to compare against the
   // one on screen. A drag shows immediately and the server confirms it a moment
-  // later, so the order is adopted only when the server's own answer changes —
-  // an add, a delete, or another tab — never on every render.
+  // later, so the order is adopted only when the server's own answer changes
+  // (an add, a delete, or another tab), never on every render.
   const serverOrder = rows.map((row) => row.id).join(",");
   const [order, setOrder] = useState(serverOrder);
   const [lastFromServer, setLastFromServer] = useState(serverOrder);
@@ -89,7 +90,7 @@ export function GiftRows({
   const visible = ordered.filter(MATCHES[filter]);
   const canReorder = filter === "all" && ordered.length > 1;
 
-  /** Moves a row on screen only — a drag does this for every row it crosses. */
+  /** Moves a row on screen only; a drag does this for every row it crosses. */
   function preview(id: string, to: number) {
     const ids = ordered.map((row) => row.id);
     const from = ids.indexOf(id);
@@ -260,6 +261,10 @@ function GiftRow({
         {row.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={row.image} alt="" className="h-full w-full object-cover" />
+        ) : row.emoji ? (
+          <span className="flex h-full items-center justify-center text-xl leading-none">
+            {row.emoji}
+          </span>
         ) : (
           <span className="flex h-full items-center justify-center text-center text-2xs leading-tight text-ink-62">
             No
@@ -300,7 +305,7 @@ function GiftRow({
             className={`text-xs ${needsPhoto ? "font-medium text-amber-dark" : "text-ink-72"}`}
           >
             {needsPhoto
-              ? "No photo found — items with a photo get claimed far more often"
+              ? "No photo found. Items with a photo get claimed far more often"
               : [row.sourceDomain ?? "Added by hand · no link", `qty ${row.quantity}`].join(
                   " · ",
                 )}
@@ -309,7 +314,7 @@ function GiftRow({
       </div>
 
       <span className="text-base font-semibold">
-        {row.priceCents === null ? "—" : formatPrice(row.priceCents)}
+        {row.priceCents === null ? "-" : formatPrice(row.priceCents)}
       </span>
 
       <Link
@@ -327,7 +332,7 @@ function GiftRow({
 }
 
 /**
- * What guests have done with this gift — only ever rendered on a list whose
+ * What guests have done with this gift; only ever rendered on a list whose
  * owner has turned the surprise off. A null count means they may not know,
  * which is not the same as nothing having happened.
  */

@@ -53,7 +53,7 @@ export default async function SharePage({
           {weeks !== null && weeks >= 4 ? (
             <div className="mb-[22px] rounded-[12px] border border-pine/20 bg-pine-wash p-4">
               <p className="mb-[5px] text-xs font-semibold text-pine-dark">
-                {weeks} weeks to go — good timing
+                {weeks} weeks to go, good timing
               </p>
               <p className="text-xs leading-[1.6] text-ink/80">
                 Lists shared a month or more ahead get about twice as many gifts

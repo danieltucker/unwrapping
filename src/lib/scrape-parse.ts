@@ -35,7 +35,7 @@ export function normalizeUrl(input: string): string | null {
   try {
     const url = new URL(withProtocol);
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    // A bare word like "wat" parses once we prepend https://, so require a dot —
+    // A bare word like "wat" parses once we prepend https://, so require a dot,
     // but allow localhost so development and tests can point at a local server.
     if (!url.hostname.includes(".") && url.hostname !== "localhost") return null;
     return url.toString();
@@ -45,7 +45,7 @@ export function normalizeUrl(input: string): string | null {
 }
 
 // Params that identify the *sharer* rather than the product. Amazon's share
-// links carry coliid/colid, which are that person's own wishlist identifiers —
+// links carry coliid/colid, which are that person's own wishlist identifiers;
 // storing them would leak one guest's Amazon account into a public list.
 const TRACKING_PARAMS = new Set([
   "coliid",
@@ -233,7 +233,7 @@ function amazonSignals($: Api): Partial<ParsedProduct> & { rawPrice?: string } {
   const hires = landing.attr("data-old-hires");
   if (hires) images.push(hires);
 
-  // Otherwise a JSON map of {url: [width, height]} — take the widest few.
+  // Otherwise a JSON map of {url: [width, height]}; take the widest few.
   const dynamic = landing.attr("data-a-dynamic-image");
   if (dynamic) {
     try {
@@ -254,7 +254,7 @@ function amazonSignals($: Api): Partial<ParsedProduct> & { rawPrice?: string } {
 }
 
 /**
- * Identity of the *picture*, ignoring size variants — a CDN will happily serve
+ * Identity of the *picture*, ignoring size variants; a CDN will happily serve
  * one photo under a dozen URLs. Amazon's are the worst offender:
  * .../images/I/81C8FISc9rL._AC_SL1500_.jpg and ._AC_SX466_.jpg are one image,
  * and offering both as choices makes the photo picker look broken.

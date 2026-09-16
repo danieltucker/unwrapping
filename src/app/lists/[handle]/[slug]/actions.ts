@@ -45,6 +45,12 @@ export async function reserveGift(
   const item = await db.select().from(items).where(eq(items.id, itemId)).get();
   if (!item || item.listId !== resolved.list.id) return { error: MESSAGES.missing };
 
+  // The card never offers this on a group gift or a cash ask, but the action
+  // is a public endpoint and should not take its word for it.
+  if (item.isGroupGift) {
+    return { error: "This one is chipped in on rather than reserved." };
+  }
+
   const firstName =
     resolved.list.claimRule === "firstName"
       ? String(formData.get("firstName") ?? "").trim()
@@ -85,11 +91,21 @@ export async function releaseGift(
   return { ok: true };
 }
 
-export type ChipInState = { ok?: boolean; error?: string; amountCents?: number };
+export type ChipInState = {
+  ok?: boolean;
+  error?: string;
+  amountCents?: number;
+  /**
+   * How to actually send the money, for a cash gift. Handed back only in the
+   * answer to a chip-in, so it reaches the person who just gave and nobody
+   * else; it is never part of the public list.
+   */
+  paymentDetails?: string | null;
+};
 
 const CHIP_IN_MESSAGES: Record<Exclude<ContributionOutcome, "recorded">, string> = {
   missing: MESSAGES.missing,
-  "not-group": "This gift isn't a group gift — reserve it instead.",
+  "not-group": "This gift isn't a group gift. Reserve it instead.",
   funded: "This one is fully funded already. Nothing more is needed.",
   "too-small": `The smallest chip-in is ${formatPrice(MIN_CONTRIBUTION_CENTS)}.`,
   "too-large": `That's larger than we can take in one go.`,
@@ -115,7 +131,7 @@ export async function chipIn(
 
   // An owner chipping in to their own list would only confuse their own totals.
   if (await viewerOwns(resolved)) {
-    return { error: "This is your own list — guests chip in from here." };
+    return { error: "This is your own list. Guests chip in from here." };
   }
 
   const item = await db.select().from(items).where(eq(items.id, itemId)).get();
@@ -123,7 +139,7 @@ export async function chipIn(
 
   const amountCents = parsePriceToCents(String(formData.get("amount") ?? "").trim());
   if (amountCents === null) {
-    return { error: "Type an amount — numbers only." };
+    return { error: "Type an amount, numbers only." };
   }
 
   const [guestToken, user] = await Promise.all([ensureGuestToken(), getCurrentUser()]);
@@ -137,7 +153,11 @@ export async function chipIn(
   if (outcome !== "recorded") return { error: CHIP_IN_MESSAGES[outcome] };
 
   revalidatePath(publicList(resolved.list, resolved.ownerHandle));
-  return { ok: true, amountCents };
+  return {
+    ok: true,
+    amountCents,
+    paymentDetails: item.kind === "cash" ? resolved.list.paymentDetails : null,
+  };
 }
 
 export type BoughtState = { ok?: boolean; error?: string };
