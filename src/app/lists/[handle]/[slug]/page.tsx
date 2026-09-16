@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
-import { GiftCard } from "@/components/gift-card";
+import { GiftGrid } from "@/components/gift-grid";
 import { EyeOffIcon } from "@/components/ui";
 import { formatPrice, site } from "@/config/site";
 import { getPublicList } from "@/lib/claims";
+import { visibility } from "@/lib/visibility";
 import { formatEventDate } from "@/lib/date";
 import * as routes from "@/lib/routes";
 import { getCurrentUser } from "@/lib/session";
@@ -30,11 +31,8 @@ export default async function PublicListPage({
   const { list, items, stats, viewerIsOwner, ownerHandle } = view;
   // Guests get offered an account after reserving; people who have one don't.
   const signedIn = (await getCurrentUser()) !== null;
-
-  // Exactly one filled button per screen: the most-wanted gift still free.
-  const primaryId = items.find(
-    (item) => item.isMostWanted && item.unitsFree > 0 && !item.claimedByViewer,
-  )?.id;
+  // Every promise on this page comes from one place, and matches this list.
+  const promise = visibility(list.surpriseMode);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -45,8 +43,9 @@ export default async function PublicListPage({
             <strong className="font-semibold">
               You&rsquo;re previewing your own list.
             </strong>{" "}
-            Every gift looks free to you because claims are hidden from you — that
-            isn&rsquo;t what your guests see.{" "}
+            {list.surpriseMode
+              ? "Every gift looks free to you because claims are hidden from you — that isn’t what your guests see."
+              : "Surprise is off for this list, so you see the same statuses your guests do. Reserving is theirs to do."}{" "}
             <Link
               href={routes.manageList(list, ownerHandle)}
               className="font-semibold text-violet"
@@ -88,7 +87,7 @@ export default async function PublicListPage({
                   : `${formatPrice(stats.minCents)} – ${formatPrice(stats.maxCents ?? stats.minCents)}`
               }
             />
-            <Stat label="The owner can see" value="Nothing" highlight />
+            <Stat label="The owner can see" value={promise.ownerSees} highlight />
           </dl>
 
           <div className="flex flex-col gap-[10px]">
@@ -103,10 +102,7 @@ export default async function PublicListPage({
 
           <div className="mt-auto flex gap-[11px] border-t border-paper-line pt-6">
             <EyeOffIcon size={17} className="mt-px shrink-0 text-paper/70" />
-            <p className="text-xs leading-[1.7] text-paper/84">
-              Reserving costs you nothing. It only stops two people buying the same
-              thing.
-            </p>
+            <p className="text-xs leading-[1.7] text-paper/84">{promise.footer}</p>
           </div>
         </aside>
 
@@ -116,20 +112,15 @@ export default async function PublicListPage({
               Nothing has been added to this list yet.
             </p>
           ) : (
-            <ul className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-3">
-              {items.map((item) => (
-                <GiftCard
-                  key={item.id}
-                  item={item}
-                  handle={handle}
-                  listKey={slug}
-                  claimRule={list.claimRule}
-                  emphasis={item.id === primaryId ? "filled" : "outline"}
-                  viewerIsOwner={viewerIsOwner}
-                  signedIn={signedIn}
-                />
-              ))}
-            </ul>
+            <GiftGrid
+              items={items}
+              handle={handle}
+              listKey={slug}
+              claimRule={list.claimRule}
+              viewerIsOwner={viewerIsOwner}
+              signedIn={signedIn}
+              surpriseMode={list.surpriseMode}
+            />
           )}
         </main>
       </div>

@@ -5,10 +5,22 @@ import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
 import { items } from "@/db/schema";
+import { formatPrice } from "@/config/site";
 import { claimItem, releaseItem } from "@/lib/claims";
-import { resolveList } from "@/lib/list-access";
+import {
+  contributeToItem,
+  MIN_CONTRIBUTION_CENTS,
+  type ContributionOutcome,
+} from "@/lib/contributions";
+import { resolveList, viewerOwns } from "@/lib/list-access";
 import { publicList } from "@/lib/routes";
-import { ensureGuestToken, readGuestToken } from "@/lib/session";
+import { setItemBought } from "@/lib/reservations";
+import { parsePriceToCents } from "@/lib/scrape-parse";
+import {
+  ensureGuestToken,
+  getCurrentUser,
+  readGuestToken,
+} from "@/lib/session";
 
 export type ReserveState = { ok?: boolean; error?: string };
 
@@ -68,6 +80,88 @@ export async function releaseGift(
   if (!guestToken) return { error: "We couldn't find your reservation." };
 
   await releaseItem(itemId, guestToken);
+
+  revalidatePath(publicList(resolved.list, resolved.ownerHandle));
+  return { ok: true };
+}
+
+export type ChipInState = { ok?: boolean; error?: string; amountCents?: number };
+
+const CHIP_IN_MESSAGES: Record<Exclude<ContributionOutcome, "recorded">, string> = {
+  missing: MESSAGES.missing,
+  "not-group": "This gift isn't a group gift — reserve it instead.",
+  funded: "This one is fully funded already. Nothing more is needed.",
+  "too-small": `The smallest chip-in is ${formatPrice(MIN_CONTRIBUTION_CENTS)}.`,
+  "too-large": `That's larger than we can take in one go.`,
+};
+
+/**
+ * Records a chip-in toward a group gift.
+ *
+ * Nothing is charged: the design authorises on contribution and captures only
+ * when the goal is met, and no payments exist yet. What is real is the amount,
+ * the running total, and that the owner is never told who gave it.
+ */
+export async function chipIn(
+  _previous: ChipInState,
+  formData: FormData,
+): Promise<ChipInState> {
+  const handle = String(formData.get("handle") ?? "");
+  const key = String(formData.get("key") ?? "");
+  const itemId = String(formData.get("itemId") ?? "");
+
+  const resolved = await resolveList(handle, key);
+  if (!resolved) return { error: MESSAGES.missing };
+
+  // An owner chipping in to their own list would only confuse their own totals.
+  if (await viewerOwns(resolved)) {
+    return { error: "This is your own list — guests chip in from here." };
+  }
+
+  const item = await db.select().from(items).where(eq(items.id, itemId)).get();
+  if (!item || item.listId !== resolved.list.id) return { error: MESSAGES.missing };
+
+  const amountCents = parsePriceToCents(String(formData.get("amount") ?? "").trim());
+  if (amountCents === null) {
+    return { error: "Type an amount — numbers only." };
+  }
+
+  const [guestToken, user] = await Promise.all([ensureGuestToken(), getCurrentUser()]);
+  const outcome = await contributeToItem(
+    itemId,
+    guestToken,
+    user?.id ?? null,
+    amountCents,
+  );
+
+  if (outcome !== "recorded") return { error: CHIP_IN_MESSAGES[outcome] };
+
+  revalidatePath(publicList(resolved.list, resolved.ownerHandle));
+  return { ok: true, amountCents };
+}
+
+export type BoughtState = { ok?: boolean; error?: string };
+
+/**
+ * Ticks off a gift the viewer has reserved, from the list page.
+ *
+ * It says nothing to the owner of a surprise list: the flag lives on the
+ * guest's own claim row, which such an owner is never handed.
+ */
+export async function markGiftBought(
+  _previous: BoughtState,
+  formData: FormData,
+): Promise<BoughtState> {
+  const handle = String(formData.get("handle") ?? "");
+  const key = String(formData.get("key") ?? "");
+  const itemId = String(formData.get("itemId") ?? "");
+  const bought = formData.get("bought") === "true";
+
+  const resolved = await resolveList(handle, key);
+  if (!resolved) return { error: MESSAGES.missing };
+
+  const ok = await setItemBought(itemId, bought);
+  if (!ok) return { error: "We couldn't find your reservation for this one." };
 
   revalidatePath(publicList(resolved.list, resolved.ownerHandle));
   return { ok: true };

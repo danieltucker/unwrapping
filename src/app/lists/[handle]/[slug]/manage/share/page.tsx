@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import QRCode from "qrcode";
 
-import { CopyButton } from "@/components/copy-button";
+import { SharePanel } from "@/components/share-panel";
 import { Card } from "@/components/ui";
 import { weeksUntil } from "@/lib/date";
 import { requireOwnedList } from "@/lib/list-access";
@@ -46,35 +46,8 @@ export default async function SharePage({
         </header>
 
         <div className="p-[26px]">
-          <p className="mb-[7px] text-2xs font-semibold uppercase tracking-[.9px] text-ink-66">
-            Your link
-          </p>
-          <div className="mb-[9px] flex items-center gap-[10px] rounded-control border border-ink-line-strong bg-surface px-[13px] py-[11px]">
-            <span className="flex-1 truncate font-mono text-sm font-medium text-ink/82">
-              {shareUrl.replace(/^https?:\/\//, "")}
-            </span>
-            <CopyButton value={shareUrl} />
-          </div>
-          <p className="mb-[22px] text-xs leading-[1.6] text-ink-66">
-            Short and easy to read out. It opens{" "}
-            <span className="font-mono">{canonical}</span>.
-          </p>
-
-          <div className="mb-[22px] grid grid-cols-2 gap-[10px]">
-            <div className="rounded-[12px] border border-ink-line bg-surface p-4 text-center">
-              <div
-                className="mx-auto mb-[10px] h-[52px] w-[52px] [&>svg]:h-full [&>svg]:w-full"
-                aria-hidden="true"
-                dangerouslySetInnerHTML={{ __html: qr }}
-              />
-              <p className="text-xs font-semibold">QR code</p>
-            </div>
-            <div className="flex flex-col justify-center gap-2 rounded-[12px] border border-ink-line bg-surface p-4">
-              <p className="text-xs font-semibold text-ink-62">Invite by email</p>
-              <p className="text-2xs leading-[1.5] text-ink-62">
-                Coming later — send the link yourself for now.
-              </p>
-            </div>
+          <div className="mb-[22px]">
+            <SharePanel shareUrl={shareUrl} canonical={canonical} qrSvg={qr} />
           </div>
 
           {weeks !== null && weeks >= 4 ? (

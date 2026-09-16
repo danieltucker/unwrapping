@@ -4,7 +4,8 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
-import { CLAIM_RULES, lists, type ClaimRule } from "@/db/schema";
+import { lists } from "@/db/schema";
+import { parseClaimRule } from "@/lib/claim-rules";
 import { uniqueShortCode } from "@/lib/handle";
 import { shareList } from "@/lib/routes";
 import { ensureDraftToken } from "@/lib/session";
@@ -12,13 +13,6 @@ import { getCurrentUser } from "@/lib/session";
 import { uniqueSlug } from "@/lib/slug";
 
 export type CreateListState = { error?: string };
-
-function parseClaimRule(value: FormDataEntryValue | null): ClaimRule {
-  const candidate = String(value ?? "");
-  return (CLAIM_RULES as readonly string[]).includes(candidate)
-    ? (candidate as ClaimRule)
-    : "anonymous";
-}
 
 export async function createList(
   _previous: CreateListState,
@@ -71,6 +65,9 @@ export async function createList(
     eventDate,
     note: String(formData.get("note") ?? "").trim() || null,
       claimRule: parseClaimRule(formData.get("claimRule")),
+      // Offered at creation and editable later; a wedding registry usually
+      // wants the couple to see what has been taken.
+      surpriseMode: formData.get("surpriseMode") === "on",
     })
     .returning({ slug: lists.slug, shortCode: lists.shortCode })
     .get();

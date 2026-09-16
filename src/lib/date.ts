@@ -25,3 +25,23 @@ export function relativeEvent(date: Date | null): string | null {
   if (weeks === 1) return "1 week away";
   return `${weeks} weeks away`;
 }
+
+/** "16 September" — for lines where the weekday would be noise. */
+export function formatShortDate(date: Date): string {
+  return new Intl.DateTimeFormat(site.locale, {
+    day: "numeric",
+    month: "long",
+  }).format(date);
+}
+
+/**
+ * A Date as an <input type="date"> value. Event dates are stored at local
+ * midnight, so they're read back in local time rather than UTC — otherwise a
+ * list west of Greenwich shows the day before.
+ */
+export function toDateInput(date: Date | null): string {
+  if (!date) return "";
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}

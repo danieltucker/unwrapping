@@ -8,7 +8,9 @@ import {
   updateItem,
   type EditItemState,
 } from "@/app/lists/[handle]/[slug]/manage/items/[itemId]/edit/actions";
+import { GoalField } from "@/components/goal-field";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
+import { centsToInput } from "@/config/site";
 import { uploadPhoto, type UploadState } from "@/lib/photo-actions";
 import type { Item } from "@/db/schema";
 
@@ -25,11 +27,17 @@ export function EditGiftForm({
     {},
   );
   const [selected, setSelected] = useState(item.selectedImageIndex);
+  // A group gift needs a goal, so the field only appears once it's one.
+  const [isGroupGift, setIsGroupGift] = useState(item.isGroupGift);
   const uploadDialog = useRef<HTMLDialogElement>(null);
 
   // After an upload the server selects the new photo; follow it so the
   // preview shows what was just added rather than the old choice.
-  useEffect(() => setSelected(item.selectedImageIndex), [item.selectedImageIndex]);
+  const [lastFromServer, setLastFromServer] = useState(item.selectedImageIndex);
+  if (item.selectedImageIndex !== lastFromServer) {
+    setLastFromServer(item.selectedImageIndex);
+    setSelected(item.selectedImageIndex);
+  }
 
   const preview = item.images[selected] ?? item.images[0] ?? null;
 
@@ -107,9 +115,7 @@ export function EditGiftForm({
                   id="price"
                   name="price"
                   inputMode="decimal"
-                  defaultValue={
-                    item.priceCents === null ? "" : (item.priceCents / 100).toFixed(2)
-                  }
+                  defaultValue={centsToInput(item.priceCents)}
                   placeholder="—"
                   className="py-[9px] text-sm"
                 />
@@ -168,10 +174,17 @@ export function EditGiftForm({
             <input
               type="checkbox"
               name="isGroupGift"
-              defaultChecked={item.isGroupGift}
+              checked={isGroupGift}
+              onChange={(event) => setIsGroupGift(event.target.checked)}
               className="h-4 w-4 accent-violet"
             />
           </label>
+
+          {isGroupGift ? (
+            <GoalField
+              defaultValue={centsToInput(item.goalCents ?? item.priceCents)}
+            />
+          ) : null}
         </div>
 
         {state.error ? (

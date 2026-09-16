@@ -1,13 +1,24 @@
 import { asc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import Link from "next/link";
+import QRCode from "qrcode";
 
-import { CopyButton } from "@/components/copy-button";
-import { EyeOffIcon } from "@/components/ui";
+import { GiftRows, type EditorRow } from "@/components/gift-rows";
+import { ListSettings } from "@/components/list-settings";
+import { ShareDialog } from "@/components/share-dialog";
+import { SharePanel } from "@/components/share-panel";
+import { ButtonLink } from "@/components/ui";
 import { formatPrice } from "@/config/site";
 import { db } from "@/db";
-import { items, type Item, type List } from "@/db/schema";
-import { formatEventDate, relativeEvent } from "@/lib/date";
+import { items } from "@/db/schema";
+import { getOwnerItemStatus, getOwnerStats } from "@/lib/claims";
+import { fundingForList } from "@/lib/contributions";
+import {
+  formatEventDate,
+  formatShortDate,
+  relativeEvent,
+  toDateInput,
+} from "@/lib/date";
 import { requireOwnedList } from "@/lib/list-access";
 import * as routes from "@/lib/routes";
 
@@ -20,8 +31,12 @@ export async function generateMetadata({
 }
 
 /**
- * The owner's editor. By design it shows a claim *count* only, never which
- * gifts are claimed — see getPublicList for where that is enforced.
+ * The owner's editor.
+ *
+ * On a surprise list it shows claim *counts* only, never which gifts are
+ * claimed; on a list where the owner has turned surprise off, each row carries
+ * its status so they can see what's left to cover. Both are enforced in the
+ * data layer — see getPublicList and getOwnerItemStatus.
  */
 export default async function EditorPage({
   params,
@@ -29,81 +44,151 @@ export default async function EditorPage({
   const { handle, slug } = await params;
   const { list, ownerHandle } = await requireOwnedList(handle, slug);
 
-  const gifts = await db
-    .select()
-    .from(items)
-    .where(eq(items.listId, list.id))
-    .orderBy(asc(items.position))
-    .all();
+  const [gifts, stats, funding, status] = await Promise.all([
+    db
+      .select()
+      .from(items)
+      .where(eq(items.listId, list.id))
+      .orderBy(asc(items.position))
+      .all(),
+    getOwnerStats(list),
+    fundingForList(list.id),
+    getOwnerItemStatus(list),
+  ]);
 
   const host = (await headers()).get("host") ?? "localhost:3000";
   const protocol = host.startsWith("localhost") ? "http" : "https";
   const short = routes.shortLink(list);
   const shareUrl = `${protocol}://${host}${short ?? routes.publicList(list, ownerHandle)}`;
+  const canonical = `${host}${routes.publicList(list, ownerHandle)}`;
+  const qrSvg = await QRCode.toString(shareUrl, {
+    type: "svg",
+    margin: 0,
+    color: { dark: "#17112B", light: "#FFFFFF00" },
+  });
+
+  const rows: EditorRow[] = gifts.map((gift) => ({
+    id: gift.id,
+    title: gift.title,
+    image: gift.images[gift.selectedImageIndex] ?? gift.images[0] ?? null,
+    sourceDomain: gift.sourceDomain,
+    priceCents: gift.priceCents,
+    quantity: gift.quantity,
+    isMostWanted: gift.isMostWanted,
+    isGroupGift: gift.isGroupGift,
+    goalCents: gift.goalCents,
+    raisedCents: funding.find((f) => f.itemId === gift.id)?.raisedCents ?? 0,
+    contributorCount: funding.find((f) => f.itemId === gift.id)?.contributorCount ?? 0,
+    needsAttention: gift.needsAttention,
+    // Null on a surprise list: the row is not allowed to know.
+    claimedCount: status?.get(gift.id)?.claimedCount ?? (status ? 0 : null),
+    boughtCount: status?.get(gift.id)?.boughtCount ?? (status ? 0 : null),
+    editHref: routes.editGift(list, ownerHandle, gift.id),
+  }));
 
   const eventLine = [formatEventDate(list.eventDate), relativeEvent(list.eventDate)]
     .filter(Boolean)
     .join(" · ");
 
+  const prices = gifts
+    .map((gift) => gift.priceCents)
+    .filter((price): price is number => price !== null);
+
+  const meta = [
+    gifts.length === 0
+      ? "No gifts yet"
+      : `${gifts.length} ${gifts.length === 1 ? "gift" : "gifts"}`,
+    prices.length
+      ? `${formatPrice(Math.min(...prices))} – ${formatPrice(Math.max(...prices))}`
+      : null,
+    ownerHandle ? null : "Draft — not saved to an account",
+  ].filter(Boolean);
+
+  const hasGroupGift = gifts.some((gift) => gift.isGroupGift);
+
+  const claimedLabel = list.surpriseMode
+    ? stats.claimedCount === 1
+      ? "gift claimed — which one is hidden"
+      : "gifts claimed — which ones is hidden"
+    : stats.boughtCount > 0
+      ? `${stats.claimedCount === 1 ? "gift claimed" : "gifts claimed"} · ${stats.boughtCount} bought`
+      : stats.claimedCount === 1
+        ? "gift claimed"
+        : "gifts claimed";
+
   return (
     <main className="mx-auto w-full max-w-[1000px] px-[22px] py-8 sm:px-8">
-      <header className="mb-[22px] flex flex-wrap items-start justify-between gap-4">
-        <div>
+      {/* Identity on the left, the three things you do with a list on the
+          right: look at it as a guest, hand it out, add to it. Editing what
+          the list *is* hangs off the title, because that's what it changes. */}
+      <header className="mb-5 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0">
           {eventLine ? (
             <p className="mb-[9px] text-2xs font-semibold uppercase tracking-[1.6px] text-ink-62">
               {eventLine}
             </p>
           ) : null}
-          <h1 className="mb-[9px] font-display text-[2.5rem] leading-[1.05] tracking-[-1.2px]">
-            <span className="mr-3">{list.emoji}</span>
-            {list.name}
-          </h1>
+          <div className="mb-[9px] flex items-center gap-[10px]">
+            <h1 className="font-display text-[2.5rem] leading-[1.05] tracking-[-1.2px]">
+              <span className="mr-3">{list.emoji}</span>
+              {list.name}
+            </h1>
+            <ListSettings
+              handle={handle}
+              listKey={slug}
+              details={{
+                name: list.name,
+                emoji: list.emoji,
+                eventDate: toDateInput(list.eventDate),
+                note: list.note ?? "",
+                claimRule: list.claimRule,
+                surpriseMode: list.surpriseMode,
+              }}
+            />
+          </div>
           <p className="text-sm font-medium text-ink-72">
-            {gifts.length === 0
-              ? "No gifts yet"
-              : `${gifts.length} ${gifts.length === 1 ? "gift" : "gifts"}`}
-            <span className="px-2 opacity-40">·</span>
-            {ownerHandle ? "Saved to your account" : "Draft — not saved to an account"}
+            {meta.join(" · ")}
+            {list.sharedAt ? (
+              <span className="text-pine-dark">
+                <span className="px-2 opacity-40">·</span>
+                <span aria-hidden="true">● </span>
+                Live since {formatShortDate(list.sharedAt)}
+              </span>
+            ) : null}
           </p>
         </div>
-        <div className="flex flex-wrap gap-[10px]">
-          <Link
-            href={routes.publicList(list, ownerHandle)}
-            className="rounded-pill border border-ink-line-strong bg-surface px-[18px] py-[11px] text-sm font-semibold"
-          >
-            Preview as guest
-          </Link>
-          <Link
-            href={routes.addGift(list, ownerHandle)}
-            className="rounded-pill bg-violet px-5 py-[11px] text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
-          >
-            + Add gift
-          </Link>
+
+        <div className="flex flex-wrap items-center gap-[10px]">
+          <ButtonLink href={routes.publicList(list, ownerHandle)} variant="outline">
+            Preview
+          </ButtonLink>
+          <ShareDialog>
+            <SharePanel shareUrl={shareUrl} canonical={canonical} qrSvg={qrSvg} />
+          </ShareDialog>
+          <ButtonLink href={routes.addGift(list, ownerHandle)}>+ Add gift</ButtonLink>
         </div>
       </header>
 
-      <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-ink-line bg-surface px-4 py-3">
-        <span className="flex-1 truncate font-mono text-sm font-medium text-ink/82">
-          {shareUrl.replace(/^https?:\/\//, "")}
-        </span>
-        <CopyButton value={shareUrl} label="Copy link" />
-        <Link
-          href={routes.shareList(list, ownerHandle)}
-          className="rounded-pill border border-ink-line-strong px-[15px] py-2 text-xs font-semibold"
-        >
-          QR code
-        </Link>
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <Stat
+          figure={String(stats.linkOpens)}
+          label={
+            stats.linkOpens === 1
+              ? "person opened your link"
+              : "people opened your link"
+          }
+        />
+        <Stat figure={String(stats.claimedCount)} label={claimedLabel} tone="pine" />
+        {hasGroupGift ? (
+          <Stat
+            figure={formatPrice(stats.raisedCents)}
+            label="chipped in toward group gifts"
+            tone="rose"
+          />
+        ) : null}
       </div>
 
-      <div className="mb-[22px] flex items-center gap-3 rounded-[12px] border border-violet-edge bg-violet-wash px-4 py-[13px]">
-        <EyeOffIcon className="shrink-0 text-violet" />
-        <p className="text-xs leading-[1.55] text-ink/80">
-          <strong className="font-semibold">You&rsquo;ll only ever see a count.</strong>{" "}
-          Guests see live status; which gifts are claimed stays hidden from you.
-        </p>
-      </div>
-
-      {gifts.length === 0 ? (
+      {rows.length === 0 ? (
         <Link
           href={routes.addGift(list, ownerHandle)}
           className="block rounded-[12px] border border-dashed border-ink-line-strong px-6 py-12 text-center transition-colors duration-150 hover:bg-ink/[.02]"
@@ -116,102 +201,33 @@ export default async function EditorPage({
           </span>
         </Link>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {gifts.map((gift) => (
-            <GiftRow
-              key={gift.id}
-              gift={gift}
-              list={list}
-              ownerHandle={ownerHandle}
-            />
-          ))}
-        </ul>
+        <GiftRows rows={rows} handle={handle} listKey={slug} />
       )}
     </main>
   );
 }
 
-function GiftRow({
-  gift,
-  list,
-  ownerHandle,
-}: {
-  gift: Item;
-  list: List;
-  ownerHandle: string | null;
-}) {
-  const image = gift.images[gift.selectedImageIndex] ?? gift.images[0] ?? null;
-  const needsPhoto = gift.needsAttention === "no-photo";
-
-  return (
-    <li
-      className={`flex items-center gap-[15px] rounded-[12px] border px-[15px] py-3 ${
-        needsPhoto ? "border-amber/30 bg-amber-wash" : "border-ink-line bg-surface"
-      }`}
-    >
-      <div className="h-[52px] w-11 shrink-0 overflow-hidden rounded-[7px] bg-ink/[.05]">
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span className="flex h-full items-center justify-center text-center text-2xs leading-tight text-ink-62">
-            No
-            <br />
-            photo
-          </span>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="mb-[3px] flex flex-wrap items-center gap-2">
-          <span className="text-sm font-semibold">{gift.title}</span>
-          {gift.isMostWanted ? <Badge tone="violet">Most wanted</Badge> : null}
-          {gift.isGroupGift ? <Badge tone="rose">Group gift</Badge> : null}
-          {gift.quantity > 1 ? <Badge tone="neutral">Qty {gift.quantity}</Badge> : null}
-        </div>
-        <p
-          className={`text-xs ${needsPhoto ? "font-medium text-amber-dark" : "text-ink-72"}`}
-        >
-          {needsPhoto
-            ? "No photo found — items with a photo get claimed far more often"
-            : [gift.sourceDomain ?? "Added by hand · no link", `qty ${gift.quantity}`].join(
-                " · ",
-              )}
-        </p>
-      </div>
-
-      <span className="text-base font-semibold">
-        {gift.priceCents === null ? "—" : formatPrice(gift.priceCents)}
-      </span>
-
-      <Link
-        href={routes.editGift(list, ownerHandle, gift.id)}
-        className="rounded-control border border-ink-line px-3 py-[6px] text-xs font-semibold text-ink-72 transition-colors duration-150 hover:bg-ink/[.03]"
-      >
-        Edit
-      </Link>
-    </li>
-  );
-}
-
-function Badge({
+/** One owner-visible number. Figures are display type; the label carries the caveat. */
+function Stat({
+  figure,
+  label,
   tone,
-  children,
 }: {
-  tone: "violet" | "rose" | "neutral";
-  children: React.ReactNode;
+  figure: string;
+  label: string;
+  tone?: "pine" | "rose";
 }) {
   const tones = {
-    violet: "bg-violet/10 text-violet-hover",
-    rose: "bg-rose/10 text-rose-dark",
-    neutral: "bg-ink/[.07] text-ink-72",
+    pine: "text-pine-dark",
+    rose: "text-rose-dark",
   } as const;
 
   return (
-    <span
-      className={`rounded-pill px-2 py-[2px] text-2xs font-semibold ${tones[tone]}`}
-    >
-      {children}
-    </span>
+    <div className="rounded-[12px] border border-ink-line bg-surface px-4 py-[14px]">
+      <p className={`font-display text-[1.875rem] leading-none ${tone ? tones[tone] : ""}`}>
+        {figure}
+      </p>
+      <p className="mt-[7px] text-xs leading-[1.45] text-ink-62">{label}</p>
+    </div>
   );
 }

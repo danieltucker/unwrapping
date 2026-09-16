@@ -81,6 +81,11 @@ export async function addGift(
     .get();
 
   const isGroupGift = formData.get("isGroupGift") === "on";
+  const rawGoal = String(formData.get("goal") ?? "").trim();
+  const parsedGoal = rawGoal ? parsePriceToCents(rawGoal) : null;
+  if (isGroupGift && rawGoal && parsedGoal === null) {
+    return { error: "That goal didn't look like a number." };
+  }
 
   await db.insert(items).values({
     listId: list.id,
@@ -96,8 +101,8 @@ export async function addGift(
     reason: String(formData.get("reason") ?? "").trim() || null,
     isMostWanted: formData.get("isMostWanted") === "on",
     isGroupGift,
-    // The goal for a group gift is the item's price until a separate goal is set.
-    goalCents: isGroupGift ? priceCents : null,
+    // A group gift aims at its own price unless the owner set a goal of their own.
+    goalCents: isGroupGift ? (parsedGoal ?? priceCents) : null,
     // Items with no photo get flagged so the editor can nudge about it.
     needsAttention: images.length === 0 ? "no-photo" : null,
   });

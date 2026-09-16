@@ -3,24 +3,22 @@ import Link from "next/link";
 import * as routes from "@/lib/routes";
 
 /**
- * Offered to a guest who has reserved something.
+ * Offered to a guest who has reserved something or chipped in.
  *
- * The claim it makes has to be true: reservations are tied to a cookie in one
- * browser, and an account is what lifts them off that cookie. See the userId
- * column on claims — sign-up links this browser's reservations to the account.
+ * The claim it makes has to be true: both are tied to a cookie in one browser,
+ * and an account is what lifts them off it. See the userId columns on claims and
+ * contributions — signing up links this browser's rows to the account.
  */
-export function SavePrompt({ count }: { count: number }) {
+export function SavePrompt() {
   return (
     <aside className="rounded-card border border-violet-edge bg-violet-wash p-5">
       <p className="mb-1 text-base font-semibold">
-        Keep {count === 1 ? "this reservation" : "these reservations"} if you switch
-        browsers
+        Keep this page if you switch browsers
       </p>
       <p className="mb-4 text-sm leading-relaxed text-ink-76">
-        Right now {count === 1 ? "it's" : "they're"} remembered only in this browser.
-        Clear your cookies or open a different one and you&rsquo;ll lose track of what
-        you promised to buy. An account ties {count === 1 ? "it" : "them"} to you
-        instead.
+        Right now what you&rsquo;ve reserved and chipped in is remembered only in
+        this browser. Clear your cookies or open a different one and you&rsquo;ll
+        lose track of what you promised to buy. An account ties it to you instead.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <Link
@@ -37,8 +35,8 @@ export function SavePrompt({ count }: { count: number }) {
         </Link>
       </div>
       <p className="mt-3 text-xs text-ink-62">
-        The list owner still won&rsquo;t see what you reserved — an account
-        doesn&rsquo;t change that.
+        The list owner still won&rsquo;t see what you reserved or what you gave — an
+        account doesn&rsquo;t change that.
       </p>
     </aside>
   );

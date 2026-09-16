@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 
 /** Shared primitives built straight from the handoff tokens. */
@@ -18,9 +19,13 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
 // Sized in rem (Tailwind's scale) rather than px, so buttons grow with the
 // reader's browser font size instead of ignoring it. Sizes must match across
 // variants or side-by-side buttons disagree on height.
+//
+// The vertical padding is deliberately 1px lopsided. Gabarito leaves more room
+// under the baseline than over the caps, so a label centred by the line box
+// reads high; the pair still sums to the same height either way.
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  sm: "px-4 py-2.5 text-xs",
-  md: "px-6 py-3 text-sm",
+  sm: "px-4 pt-[0.6875rem] pb-[0.5625rem] text-xs",
+  md: "px-6 pt-[0.8125rem] pb-[0.6875rem] text-sm",
 };
 
 /** Shared geometry, so any two buttons placed together line up. */
@@ -35,6 +40,29 @@ export function Button({
 }: ComponentProps<"button"> & { variant?: ButtonVariant; size?: ButtonSize }) {
   return (
     <button
+      className={cx(
+        buttonBase,
+        BUTTON_SIZES[size],
+        BUTTON_VARIANTS[variant],
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/**
+ * A link that has to look like a button. Same geometry as Button, so the two
+ * sit together in a row without disagreeing on height or label position.
+ */
+export function ButtonLink({
+  variant = "primary",
+  size = "md",
+  className,
+  ...props
+}: ComponentProps<typeof Link> & { variant?: ButtonVariant; size?: ButtonSize }) {
+  return (
+    <Link
       className={cx(
         buttonBase,
         BUTTON_SIZES[size],
@@ -140,12 +168,44 @@ export function EyeOffIcon({
   );
 }
 
-/** "You'll never see who claimed what" — the violet-wash panel from screen 03. */
-export function SurprisePanel({ children }: { children: ReactNode }) {
+
+/** Pencil — "edit what this is", as opposed to editing a gift. */
+export function PencilIcon({ size = 15, className }: { size?: number; className?: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-[12px] border border-violet-edge bg-violet-wash px-4 py-[13px]">
-      <EyeOffIcon className="shrink-0 text-violet" stroke="currentColor" />
-      <p className="text-xs leading-[1.55] text-ink/80">{children}</p>
-    </div>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+      <path d="M14.5 6.5l3 3" />
+    </svg>
+  );
+}
+
+/** The chain link that marks anything to do with the share URL. */
+export function LinkIcon({ size = 15, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7l-1.4 1.4" />
+      <path d="M13.5 10.5a4 4 0 0 0-5.7 0L5 13.3a4 4 0 1 0 5.7 5.7l1.4-1.4" />
+    </svg>
   );
 }

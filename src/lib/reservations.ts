@@ -1,12 +1,12 @@
 import "server-only";
 
-import { and, eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, isNull, sql, type SQL } from "drizzle-orm";
 
 import { db } from "@/db";
 import { claims, items, lists, users } from "@/db/schema";
 import { outboundHref } from "@/lib/outbound";
 import { listSegments, publicList } from "@/lib/routes";
-import { getCurrentUser, readGuestToken } from "@/lib/session";
+import { viewerScope } from "@/lib/viewer";
 
 export type Reservation = {
   claimId: string;
@@ -22,6 +22,8 @@ export type Reservation = {
   listEmoji: string;
   eventDate: Date | null;
   listPath: string;
+  /** False when the owners of that list can see what has been taken. */
+  listIsSurprise: boolean;
   /** Identifies the list to the release action. */
   handle: string;
   listKey: string;
@@ -34,22 +36,9 @@ export type InvitedList = {
   freeCount: number;
 };
 
-/**
- * Which claims belong to whoever is asking.
- *
- * A guest is known by a cookie. Once they create an account, their claims are
- * stamped with a userId as well, so the reservations follow the person rather
- * than the browser — which is the promise the sign-up prompt makes.
- */
+/** Which claims belong to whoever is asking — see viewerScope. */
 async function mine(): Promise<SQL | null> {
-  const [guestToken, user] = await Promise.all([readGuestToken(), getCurrentUser()]);
-
-  const conditions: SQL[] = [];
-  if (guestToken) conditions.push(eq(claims.guestToken, guestToken));
-  if (user) conditions.push(eq(claims.userId, user.id));
-
-  if (conditions.length === 0) return null;
-  return conditions.length === 1 ? conditions[0] : or(...conditions)!;
+  return viewerScope(claims.guestToken, claims.userId);
 }
 
 /** Live reservation count, for the header. Cheap on purpose: it runs on every page. */
@@ -100,6 +89,7 @@ export async function getGuestReservations(): Promise<{
       listEmoji: list.emoji,
       eventDate: list.eventDate,
       listPath: publicList(list, handle),
+      listIsSurprise: list.surpriseMode,
       handle: segmentHandle,
       listKey: segmentKey,
     };
@@ -171,4 +161,24 @@ export async function linkGuestClaimsToUser(
     .where(and(eq(claims.guestToken, guestToken), isNull(claims.userId)));
 
   return result.changes;
+}
+
+/**
+ * Ticks a gift off as bought from the list page itself, rather than from the
+ * reservations page. Addressed by item, because that is what a gift card knows
+ * — the caller's own live claim on it is what gets updated, and nobody else's.
+ */
+export async function setItemBought(
+  itemId: string,
+  bought: boolean,
+): Promise<boolean> {
+  const scope = await mine();
+  if (!scope) return false;
+
+  const result = await db
+    .update(claims)
+    .set({ markedBought: bought })
+    .where(and(eq(claims.itemId, itemId), isNull(claims.releasedAt), scope));
+
+  return result.changes > 0;
 }

@@ -8,6 +8,7 @@ import { lists, users } from "@/db/schema";
 import { uniqueHandle } from "@/lib/handle";
 import { hashPassword } from "@/lib/password";
 import { manageList } from "@/lib/routes";
+import { linkGuestContributionsToUser } from "@/lib/contributions";
 import { linkGuestClaimsToUser } from "@/lib/reservations";
 import { createSession, readDraftToken, readGuestToken } from "@/lib/session";
 
@@ -62,7 +63,10 @@ export async function signUp(
   // Reservations made in this browser become theirs too, so the sign-up
   // prompt on /reserved tells the truth.
   const guestToken = await readGuestToken();
-  if (guestToken) await linkGuestClaimsToUser(guestToken, user.id);
+  if (guestToken) {
+    await linkGuestClaimsToUser(guestToken, user.id);
+    await linkGuestContributionsToUser(guestToken, user.id);
+  }
 
   const draftToken = await readDraftToken();
   let firstClaimed: { slug: string; shortCode: string | null } | null = null;

@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { lists, users } from "@/db/schema";
+import { viewerOwns } from "@/lib/list-access";
 import { publicList } from "@/lib/routes";
 
 /**
@@ -23,6 +24,21 @@ export async function GET(request: Request, context: RouteContext<"/[code]">) {
     .get();
 
   if (!row) return new Response("Not found", { status: 404 });
+
+  // The one number the owner gets about their guests, and the only place it is
+  // counted: an open of the link they actually shared. Their own visits don't
+  // count, or the figure would mostly be them. It is a total and nothing else —
+  // never who opened it, never when, never which gift they went on to claim.
+  if (!(await viewerOwns({ list: row.list, ownerHandle: row.handle }))) {
+    await db
+      .update(lists)
+      .set({
+        linkOpens: sql`${lists.linkOpens} + 1`,
+        // First time anyone but the owner opened it is when the list went live.
+        sharedAt: row.list.sharedAt ?? new Date(),
+      })
+      .where(eq(lists.id, row.list.id));
+  }
 
   return Response.redirect(
     new URL(publicList(row.list, row.handle), request.url),

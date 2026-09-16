@@ -185,13 +185,21 @@ export const contributions = sqliteTable(
       .notNull()
       .references(() => items.id, { onDelete: "cascade" }),
     guestToken: text("guest_token").notNull(),
+    /**
+     * Set once a contributor signs in, so a chip-in follows the person rather
+     * than the browser. Never exposed to the list's owner.
+     */
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     amountCents: integer("amount_cents").notNull(),
     status: text("status", { enum: CONTRIBUTION_STATUSES })
       .notNull()
       .default("pending"),
     createdAt: createdAt(),
   },
-  (t) => [index("contributions_item_idx").on(t.itemId)],
+  (t) => [
+    index("contributions_item_idx").on(t.itemId),
+    index("contributions_user_idx").on(t.userId),
+  ],
 );
 
 export type User = typeof users.$inferSelect;

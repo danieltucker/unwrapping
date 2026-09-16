@@ -69,6 +69,11 @@ export async function updateItem(
   );
 
   const isGroupGift = formData.get("isGroupGift") === "on";
+  const rawGoal = String(formData.get("goal") ?? "").trim();
+  const parsedGoal = rawGoal ? parsePriceToCents(rawGoal) : null;
+  if (isGroupGift && rawGoal && parsedGoal === null) {
+    return { error: "That goal didn't look like a number." };
+  }
 
   await db
     .update(items)
@@ -80,7 +85,7 @@ export async function updateItem(
       reason: String(formData.get("reason") ?? "").trim() || null,
       isMostWanted: formData.get("isMostWanted") === "on",
       isGroupGift,
-      goalCents: isGroupGift ? (priceCents ?? item.goalCents) : null,
+      goalCents: isGroupGift ? (parsedGoal ?? priceCents ?? item.goalCents) : null,
       needsAttention: item.images.length === 0 ? "no-photo" : null,
     })
     .where(eq(items.id, itemId));

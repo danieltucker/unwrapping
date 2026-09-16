@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { lists, users } from "@/db/schema";
 import { manageList } from "@/lib/routes";
 import { verifyPassword } from "@/lib/password";
+import { linkGuestContributionsToUser } from "@/lib/contributions";
 import { linkGuestClaimsToUser } from "@/lib/reservations";
 import {
   createSession,
@@ -38,7 +39,10 @@ export async function signIn(
 
   // Anything reserved in this browser joins the account as well.
   const guestToken = await readGuestToken();
-  if (guestToken) await linkGuestClaimsToUser(guestToken, user.id);
+  if (guestToken) {
+    await linkGuestClaimsToUser(guestToken, user.id);
+    await linkGuestContributionsToUser(guestToken, user.id);
+  }
 
   const draftToken = await readDraftToken();
   if (draftToken) {

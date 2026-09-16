@@ -3,15 +3,18 @@
 import { useActionState, useEffect, useRef } from "react";
 
 import {
-  reserveGift,
+  markGiftBought,
   releaseGift,
+  reserveGift,
+  type BoughtState,
   type ReserveState,
 } from "@/app/lists/[handle]/[slug]/actions";
 import Link from "next/link";
 
+import { GiftSummary } from "@/components/gift-summary";
 import { Button } from "@/components/ui";
-import { formatPrice } from "@/config/site";
 import type { PublicItem } from "@/lib/claims";
+import { visibility } from "@/lib/visibility";
 import * as routes from "@/lib/routes";
 
 export function ReserveDialog({
@@ -21,6 +24,7 @@ export function ReserveDialog({
   needsFirstName,
   emphasis,
   signedIn,
+  surpriseMode,
 }: {
   item: PublicItem;
   handle: string;
@@ -28,6 +32,7 @@ export function ReserveDialog({
   needsFirstName: boolean;
   emphasis: "filled" | "outline";
   signedIn: boolean;
+  surpriseMode: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [state, action, pending] = useActionState<ReserveState, FormData>(
@@ -96,23 +101,7 @@ export function ReserveDialog({
           <input type="hidden" name="key" value={listKey} />
           <input type="hidden" name="itemId" value={item.id} />
 
-          <div className="mb-[22px] flex gap-[15px]">
-            <div className="h-[88px] w-[72px] shrink-0 overflow-hidden rounded-[9px] bg-ink/[.05]">
-              {item.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.image} alt="" className="h-full w-full object-cover" />
-              ) : null}
-            </div>
-            <div>
-              <p className="mb-1 text-base font-semibold leading-[1.3]">
-                {item.title}
-              </p>
-              <p className="text-sm font-medium text-ink-72">
-                {item.priceCents !== null ? formatPrice(item.priceCents) : "No price"}
-                {item.sourceDomain ? ` · ${item.sourceDomain}` : ""}
-              </p>
-            </div>
-          </div>
+          <GiftSummary item={item} />
 
           <h2
             id={`reserve-heading-${item.id}`}
@@ -121,8 +110,7 @@ export function ReserveDialog({
             Reserve this gift?
           </h2>
           <p className="mb-5 text-sm leading-[1.7] text-ink/78">
-            It&rsquo;ll show as taken to other guests. The list owner sees nothing.
-            Nothing is charged, and you can release it any time.
+            {visibility(surpriseMode).reserving}
           </p>
 
           {needsFirstName ? (
@@ -210,6 +198,56 @@ export function ReleaseButton({
         className="w-full text-ink-72"
       >
         {pending ? "Releasing…" : "Release it"}
+      </Button>
+      {state.error ? (
+        <p role="alert" className="mt-2 text-xs text-rose-dark">
+          {state.error}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
+/**
+ * Ticks a reserved gift off as bought, from the list page itself.
+ *
+ * On a surprise list this changes nothing the owner can see; on a list where
+ * surprise is off it is how they know a gift is actually handled.
+ */
+export function BoughtButton({
+  itemId,
+  handle,
+  listKey,
+  bought,
+  size = "md",
+  className = "w-full",
+}: {
+  itemId: string;
+  handle: string;
+  listKey: string;
+  bought: boolean;
+  size?: "sm" | "md";
+  className?: string;
+}) {
+  const [state, action, pending] = useActionState<BoughtState, FormData>(
+    markGiftBought,
+    {},
+  );
+
+  return (
+    <form action={action} className={className}>
+      <input type="hidden" name="handle" value={handle} />
+      <input type="hidden" name="key" value={listKey} />
+      <input type="hidden" name="itemId" value={itemId} />
+      <input type="hidden" name="bought" value={String(!bought)} />
+      <Button
+        type="submit"
+        variant={bought ? "outline" : "dark"}
+        size={size}
+        disabled={pending}
+        className={`w-full ${bought ? "text-pine-dark" : ""}`}
+      >
+        {bought ? "✓ Bought" : "Mark as bought"}
       </Button>
       {state.error ? (
         <p role="alert" className="mt-2 text-xs text-rose-dark">

@@ -56,6 +56,15 @@ export function ReservationRow({
           ) : null}
         </p>
 
+        {/* Said here as well as on the list, because this page is where people
+            come back to days later and the two lists may differ. */}
+        {!reservation.listIsSurprise ? (
+          <p className="mb-[7px] text-xs font-medium text-ink-62">
+            This list isn&rsquo;t a surprise — its owner can see the gift is taken,
+            never that it was you.
+          </p>
+        ) : null}
+
         <p className="mb-[13px] text-xs text-ink-72">
           Reserved by you on {reservedOn}
           {reservation.href ? (

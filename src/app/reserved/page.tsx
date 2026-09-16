@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ContributionRow } from "@/components/contribution-row";
 import { ReservationRow } from "@/components/reservation-row";
 import { SavePrompt } from "@/components/save-prompt";
 import { EyeOffIcon } from "@/components/ui";
-import { site } from "@/config/site";
-import { formatEventDate } from "@/lib/date";
+import { formatEventDate, formatShortDate } from "@/lib/date";
+import { getGuestContributions } from "@/lib/contributions";
 import { getGuestReservations } from "@/lib/reservations";
 import { getCurrentUser } from "@/lib/session";
 
@@ -16,15 +17,17 @@ export const metadata: Metadata = {
 };
 
 export default async function ReservedPage() {
-  const [{ reservations, invitedLists }, user] = await Promise.all([
+  const [{ reservations, invitedLists }, contributions, user] = await Promise.all([
     getGuestReservations(),
+    getGuestContributions(),
     getCurrentUser(),
   ]);
 
-  const dateFormat = new Intl.DateTimeFormat(site.locale, {
-    day: "numeric",
-    month: "long",
-  });
+  /** The caps line above a row: which list, and when the event is. */
+  const eventLine = (name: string, date: Date | null) =>
+    [name, formatEventDate(date)].filter(Boolean).join(" · ");
+
+  const nothingYet = reservations.length === 0 && contributions.length === 0;
 
   return (
     <main className="mx-auto w-full max-w-[46rem] px-[1.375rem] py-10">
@@ -37,12 +40,12 @@ export default async function ReservedPage() {
           : "Only you can see this page. It's remembered in this browser, so use the same one to come back to it."}
       </p>
 
-      {reservations.length === 0 ? (
+      {nothingYet ? (
         <div className="rounded-card border border-dashed border-ink-line-strong px-6 py-14 text-center">
           <p className="mb-2 text-base font-semibold">Nothing reserved yet</p>
           <p className="text-sm leading-relaxed text-ink-72">
-            When you reserve a gift from someone&rsquo;s list, it shows up here so
-            you can find it again.
+            When you reserve a gift or chip in toward one, it shows up here so you
+            can find it again.
           </p>
         </div>
       ) : (
@@ -50,31 +53,50 @@ export default async function ReservedPage() {
           {/* Offered only to guests: an account is what lifts these off the cookie. */}
           {!user ? (
             <div className="mb-5">
-              <SavePrompt count={reservations.length} />
+              <SavePrompt />
             </div>
           ) : null}
 
-          <ul className="mb-7 flex flex-col gap-2.5">
-            {reservations.map((reservation) => (
-              <ReservationRow
-                key={reservation.claimId}
-                reservation={reservation}
-                eventLine={[
-                  reservation.listName,
-                  formatEventDate(reservation.eventDate),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-                reservedOn={dateFormat.format(reservation.claimedAt)}
-              />
-            ))}
-          </ul>
+          {reservations.length > 0 ? (
+            <ul className="mb-7 flex flex-col gap-2.5">
+              {reservations.map((reservation) => (
+                <ReservationRow
+                  key={reservation.claimId}
+                  reservation={reservation}
+                  eventLine={eventLine(reservation.listName, reservation.eventDate)}
+                  reservedOn={formatShortDate(reservation.claimedAt)}
+                />
+              ))}
+            </ul>
+          ) : null}
+
+          {contributions.length > 0 ? (
+            <section className="mb-7">
+              <h2 className="mb-3 text-2xs font-semibold uppercase tracking-[0.12em] text-ink-62">
+                Group gifts you&rsquo;ve chipped in on
+              </h2>
+              <ul className="flex flex-col gap-2.5">
+                {contributions.map((contribution) => (
+                  <ContributionRow
+                    key={contribution.itemId}
+                    contribution={contribution}
+                    eventLine={eventLine(
+                      contribution.listName,
+                      contribution.eventDate,
+                    )}
+                    chippedOn={formatShortDate(contribution.lastChippedAt)}
+                  />
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <div className="mb-7 flex items-center gap-3 rounded-[0.75rem] border border-violet-edge bg-violet-wash px-4 py-3">
             <EyeOffIcon className="shrink-0 text-violet" />
             <p className="text-xs leading-relaxed text-ink/80">
-              The list owner still sees nothing — not what you reserved, and not
-              that it was you. Releasing a gift puts it straight back on the list.
+Nobody is ever told who reserved or gave what. On a surprise list the owner
+              doesn&rsquo;t even see which gifts are taken. Releasing a gift puts it
+              straight back on the list.
             </p>
           </div>
         </>

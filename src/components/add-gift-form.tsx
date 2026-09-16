@@ -9,7 +9,9 @@ import {
   type AddGiftState,
   type PreviewState,
 } from "@/app/lists/[handle]/[slug]/manage/add/actions";
+import { GoalField } from "@/components/goal-field";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
+import { centsToInput } from "@/config/site";
 import type { ScrapeResult } from "@/lib/scrape";
 
 const EMPTY_MANUAL: ScrapeResult = {
@@ -105,7 +107,7 @@ export function AddGiftForm({
       </button>
 
       <p className="mt-3 text-xs leading-[1.6] text-ink-62">
-        Cash goals and the browser button come later.
+        The browser button comes later.
       </p>
     </div>
   );
@@ -148,9 +150,10 @@ function ConfirmGift({
 }) {
   const [state, action, pending] = useActionState<AddGiftState, FormData>(addGift, {});
   const [selected, setSelected] = useState(0);
+  // A group gift needs a goal, so the field only appears once it's one.
+  const [isGroupGift, setIsGroupGift] = useState(false);
 
-  const priceValue =
-    result.priceCents !== null ? (result.priceCents / 100).toFixed(2) : "";
+  const priceValue = centsToInput(result.priceCents);
 
   return (
     <form action={action} className="p-[26px]">
@@ -283,8 +286,18 @@ function ConfirmGift({
               Splits the price across several people
             </span>
           </span>
-          <input type="checkbox" name="isGroupGift" className="h-4 w-4 accent-violet" />
+          <input
+            type="checkbox"
+            name="isGroupGift"
+            checked={isGroupGift}
+            onChange={(event) => setIsGroupGift(event.target.checked)}
+            className="h-4 w-4 accent-violet"
+          />
         </label>
+
+        {isGroupGift ? (
+          <GoalField defaultValue={priceValue} />
+        ) : null}
       </div>
 
       {state.error ? (

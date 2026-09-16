@@ -26,3 +26,8 @@ export function formatPrice(cents: number): string {
 export function listUrl(slug: string): string {
   return `${site.domain}/${slug}`;
 }
+
+/** Cents as an editable amount: "42.00", or blank when there isn't one. */
+export function centsToInput(cents: number | null): string {
+  return cents === null ? "" : (cents / 100).toFixed(2);
+}
