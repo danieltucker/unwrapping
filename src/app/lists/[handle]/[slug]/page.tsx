@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { GiftCard } from "@/components/gift-card";
-import { SiteHeader } from "@/components/site-header";
 import { EyeOffIcon } from "@/components/ui";
 import { formatPrice, site } from "@/config/site";
 import { getPublicList } from "@/lib/claims";
@@ -38,9 +37,7 @@ export default async function PublicListPage({
   )?.id;
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <SiteHeader />
-
+    <div className="flex flex-1 flex-col">
       {viewerIsOwner ? (
         <p className="flex items-center gap-3 border-b border-violet-edge bg-violet-wash px-[22px] py-3 text-xs leading-[1.55] text-ink/80 sm:px-8">
           <EyeOffIcon size={17} className="shrink-0 text-violet" />
