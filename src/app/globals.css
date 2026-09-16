@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* Design tokens — see design_handoff_wishly/README.md.
+   The design deliberately commits to one light look; there is no dark theme. */
+@theme {
+  --color-ink: #17112b;
+  --color-ink-76: rgba(23, 17, 43, 0.76);
+  --color-ink-72: rgba(23, 17, 43, 0.72);
+  --color-ink-66: rgba(23, 17, 43, 0.66);
+  --color-ink-62: rgba(23, 17, 43, 0.62);
+  --color-ink-line: rgba(23, 17, 43, 0.1);
+  --color-ink-line-strong: rgba(23, 17, 43, 0.18);
+
+  --color-paper: #faf8f5;
+  --color-surface: #ffffff;
+
+  --color-violet: #5738e8;
+  --color-violet-hover: #4527c7;
+  --color-violet-wash: rgba(87, 56, 232, 0.07);
+  --color-violet-edge: rgba(87, 56, 232, 0.18);
+
+  --color-rose: #b4145a;
+  --color-rose-dark: #8e0f47;
+  --color-rose-wash: rgba(180, 20, 90, 0.1);
+
+  --color-pine: #0e6e58;
+  --color-pine-dark: #0a5745;
+  --color-pine-wash: rgba(14, 110, 88, 0.08);
+
+  --color-amber: #8a5510;
+  --color-amber-dark: #7a4a0e;
+  --color-amber-wash: rgba(138, 85, 16, 0.05);
+
+  --color-champagne: #f2d48b;
+
+  /* Text and fills on the dark ink surface */
+  --color-paper-88: rgba(250, 248, 245, 0.88);
+  --color-paper-72: rgba(250, 248, 245, 0.72);
+  --color-paper-fill: rgba(250, 248, 245, 0.1);
+  --color-paper-line: rgba(250, 248, 245, 0.16);
+
+  /* Lighter status variants — legible on ink only, never on paper */
+  --color-violet-on-ink: #8a72ff;
+  --color-rose-on-ink: #e85a93;
+  --color-pine-on-ink: #3fbfa1;
+
+  --font-sans: var(--font-gabarito), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, Menlo, monospace;
+
+  /* Radius is fixed at three values, plus the phone bezel exception */
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(23, 17, 43, 0.04),
+    0 10px 30px -18px rgba(23, 17, 43, 0.3);
+  --shadow-sheet: 0 -10px 40px rgba(23, 17, 43, 0.3);
+  --shadow-float: 0 30px 60px -20px rgba(0, 0, 0, 0.5);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    /* Prices must align down a column */
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-violet);
+    outline-offset: 2px;
+  }
+}
+
+/* The spec's focus treatment for bordered controls: a violet border plus a soft ring. */
+@utility focus-ring {
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-violet);
+    box-shadow: 0 0 0 3px rgba(87, 56, 232, 0.14);
+  }
+}
