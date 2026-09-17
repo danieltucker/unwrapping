@@ -14,8 +14,12 @@ services:
     container_name: unwrap
     restart: unless-stopped
     ports:
-      # Left side is the port on the NAS. Change it if 3000 is taken.
-      - "3000:3000"
+      # Host port, then the container port. Set APP_PORT in .env to move the
+      # host side. If cloudflared runs on this host, prefix the host address
+      # too — "127.0.0.1:${APP_PORT:-3000}:3000" — so the only way in is the
+      # tunnel. If cloudflared is a container on the same network, drop this
+      # ports block entirely and point its ingress at http://unwrap:3000.
+      - "${APP_PORT:-3000}:3000"
     environment:
       # Signs session and guest cookies. Required, and there is no default:
       # the app refuses to start without it rather than inventing one that
