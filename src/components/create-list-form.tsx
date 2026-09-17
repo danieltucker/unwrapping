@@ -10,7 +10,16 @@ import {
 import { Button } from "@/components/ui";
 import { createList, type CreateListState } from "@/app/new/actions";
 
-export function CreateListForm({ today }: { today: string }) {
+export function CreateListForm({
+  today,
+  defaultName = "",
+  defaultEmoji = "🎁",
+}: {
+  today: string;
+  /** Set when the occasion arrived with the visitor, e.g. from /new?for=. */
+  defaultName?: string;
+  defaultEmoji?: string;
+}) {
   const [state, action, pending] = useActionState<CreateListState, FormData>(
     createList,
     {},
@@ -19,7 +28,12 @@ export function CreateListForm({ today }: { today: string }) {
   return (
     <form action={action} className="p-7">
       {/* `today` comes from the server to avoid a hydration mismatch. */}
-      <ListIdentityFields minDate={today} autoFocus />
+      <ListIdentityFields
+        minDate={today}
+        defaultName={defaultName}
+        defaultEmoji={defaultEmoji}
+        autoFocus
+      />
       <ClaimRuleFields />
       <SurpriseChoice />
 

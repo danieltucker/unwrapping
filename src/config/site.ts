@@ -1,16 +1,58 @@
 /**
  * Product identity lives here and nowhere else, so renaming is a one-file change.
  * The name is still provisional; see README.
+ *
+ * The address an instance is served from is *not* here: it changes per
+ * deployment rather than per product, and this module reaches the browser. See
+ * [`src/lib/origin.ts`](../lib/origin.ts).
  */
+
 export const site = {
   name: "Unwrap",
   domain: "unwrapp.ing",
   tagline: "A gift list people actually use.",
+  /**
+   * The <title> of the landing page. The tagline is how we talk about
+   * ourselves; this is what someone types into a search box, which is rarely
+   * the same string.
+   */
+  searchTitle: "Free gift list and wishlist for any occasion",
+  /**
+   * The meta description. Kept under 160 characters because search results cut
+   * it there, and a sentence that ends mid-word reads like a broken page.
+   */
   description:
-    "Paste a link from any shop and we fill in the photo, title and price. Share one link. Guests claim what they're buying, so nobody doubles up, and you never find out who chose what.",
+    "Make a free gift list for a birthday, wedding, baby shower or Christmas. Paste links from any shop, share one link, and nobody buys the same thing twice.",
+  /** The hero's opening paragraph: the same pitch with room to breathe. */
+  summary:
+    "A free wishlist for birthdays, weddings, baby showers, Christmas and every other excuse for a present. Paste links from any shop, share one link, and guests claim what they’re buying without making an account.",
   currency: "USD",
   locale: "en-US",
 } as const;
+
+/**
+ * The occasions we say out loud.
+ *
+ * Two jobs, which is why they live in config rather than in the page: they are
+ * the words someone searches for, and each one is a way into the product, so
+ * `prefill` is the list name we hand to /new. Keep every prefill inside the
+ * vocabulary in `src/lib/emoji.ts`, or the suggested emoji arrives as a plain
+ * present and the shortcut feels broken.
+ */
+export const occasions = [
+  { emoji: "🎂", label: "Birthdays", prefill: "My birthday" },
+  { emoji: "💍", label: "Weddings", prefill: "Our wedding" },
+  { emoji: "🍼", label: "Baby showers", prefill: "Baby shower" },
+  { emoji: "🎄", label: "Christmas", prefill: "Christmas list" },
+  { emoji: "🏡", label: "Housewarming", prefill: "Housewarming" },
+  { emoji: "🎓", label: "Graduation", prefill: "Graduation" },
+  { emoji: "❤️", label: "Anniversaries", prefill: "Our anniversary" },
+  { emoji: "🥂", label: "Engagements", prefill: "Engagement party" },
+  { emoji: "✈️", label: "Honeymoon fund", prefill: "Honeymoon fund" },
+  { emoji: "🏖️", label: "Retirement", prefill: "Retirement" },
+  { emoji: "🕎", label: "Hanukkah", prefill: "Hanukkah" },
+  { emoji: "🪔", label: "Diwali", prefill: "Diwali" },
+] as const;
 
 /** Prices are stored as integer cents to keep arithmetic exact. */
 export function formatPrice(cents: number): string {

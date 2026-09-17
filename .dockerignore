@@ -1,0 +1,27 @@
+# The build installs its own dependencies for Linux; the host's are the wrong
+# platform for better-sqlite3's prebuilt binary.
+node_modules
+.next
+out
+build
+
+# Never copy a database, uploaded photos, or a secret into an image layer.
+data
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+*.tsbuildinfo
+npm-debug.log*
+
+# Documentation and the design prototype are not part of the app.
+README.md
+AGENTS.md
+CLAUDE.md
+docs
+design_handoff_wishly
+
+# Logo masters. What the site serves lives in public/ and src/app/.
+images

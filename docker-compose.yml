@@ -1,0 +1,43 @@
+# Running Unwrap on your own hardware. Written for TrueNAS SCALE, which takes
+# this file as a Custom App, and works unchanged under plain `docker compose`.
+#
+#   1. cp .env.example .env   and fill in SESSION_SECRET and SITE_URL
+#   2. docker compose up -d --build
+#
+# Full instructions, including the TrueNAS dataset and permissions: docs/self-hosting.md
+
+services:
+  unwrap:
+    build: .
+    # Swap `build` for `image` if you push this somewhere and pull it here:
+    # image: ghcr.io/you/unwrap:latest
+    container_name: unwrap
+    restart: unless-stopped
+    ports:
+      # Left side is the port on the NAS. Change it if 3000 is taken.
+      - "3000:3000"
+    environment:
+      # Signs session and guest cookies. Required, and there is no default:
+      # the app refuses to start without it rather than inventing one that
+      # would sign everybody out on the next restart.
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      # The address people actually reach this instance on, including the
+      # scheme and any port. It ends up in share links, canonical URLs and
+      # link previews, and it decides whether cookies are marked Secure: over
+      # plain http say so here, or sign-in will appear to do nothing.
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
+    volumes:
+      # The database and the uploaded gift photos. On TrueNAS, point the left
+      # side at a dataset, e.g. /mnt/tank/apps/unwrap/data.
+      - ./data:/app/data
+    # Nothing outside the volume needs to survive a restart, so the rest of the
+    # filesystem is read-only. If the container won't start on your box, this is
+    # the first line to comment out.
+    read_only: true
+    tmpfs:
+      - /tmp
+      # Next's own runtime cache. Ours holds very little, being all dynamic
+      # pages, but the server expects to be able to write here.
+      - /app/.next/cache
+    security_opt:
+      - no-new-privileges:true

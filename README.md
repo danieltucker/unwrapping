@@ -36,6 +36,16 @@ Open http://localhost:3000.
 |---|---|
 | `DATABASE_URL` | SQLite file URL. Defaults to `file:./data/app.db`. |
 | `SESSION_SECRET` | Signs session and guest cookies. Any long random string. |
+| `SITE_URL` | The address this instance is served from, scheme and port included. Feeds canonical URLs, Open Graph tags, `robots.txt` and the sitemap, and decides whether cookies may be `Secure`. Defaults to `https://unwrapp.ing`, so set it anywhere else. See [`src/lib/origin.ts`](src/lib/origin.ts). |
+| `DB_AUTO_MIGRATE` | Apply pending migrations when the server starts. On in production, off in development. `0` to manage them yourself. |
+
+## Deploying
+
+`docker compose up -d --build`, with a volume on `/app/data`. The image is a
+standalone Next build that installs nothing at runtime and migrates the database
+as it starts. Full instructions, including TrueNAS SCALE and the two mistakes
+everybody makes with cookies and file permissions, are in
+[docs/self-hosting.md](docs/self-hosting.md).
 
 ## Scripts
 
@@ -66,7 +76,13 @@ against the framework.
 
 ```
 src/app/                    routes
-  page.tsx                  landing
+  page.tsx                  landing: the pitch, the occasions, the FAQ. The
+                            only page search engines may index, and the only
+                            place new owners are given instructions.
+  robots.ts, sitemap.ts     generated at request time, because the origin is an
+  opengraph-image.tsx       environment variable. The OG image is deliberately
+                            generic: a shared list must not give its gifts away
+                            in a chat unfurl.
   sign-in/, sign-up/        accounts
   new/                      create a list (step 1)
   lists/page.tsx            the owner's dashboard of their lists
@@ -99,6 +115,13 @@ A few things worth knowing before you change them:
   one place later. Never render a raw `item.url`.
 - **Money is integer cents** everywhere. `formatPrice` in `src/config/site.ts`
   is the only place that renders it.
+- **Nothing but `/` is indexable.** Pages under `/lists` are `noindex` through
+  [`src/app/lists/layout.tsx`](src/app/lists/layout.tsx), and `robots.txt`
+  allows only the landing page. A list is unlisted, not secret, so a crawler
+  that found one would publish somebody's birthday.
+- **Landing-page copy may only promise what exists.** The FAQ answers in
+  `src/app/page.tsx` are also served as schema.org `FAQPage`, where a promise
+  outlives the page. Read "Not built yet" below before adding one.
 
 ## Not built yet
 

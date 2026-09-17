@@ -8,7 +8,10 @@ import { db } from "@/db";
 import { items, lists } from "@/db/schema";
 import { getCurrentUser, readDraftToken } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Save your list" };
+export const metadata: Metadata = {
+  title: "Save your list",
+  robots: { index: false, follow: false },
+};
 
 export default async function SignUpPage() {
   if (await getCurrentUser()) redirect("/");

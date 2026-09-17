@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { AccountMenu } from "@/components/account-menu";
+import { BrandMark } from "@/components/ui";
 import { site } from "@/config/site";
 import { countGuestReservations } from "@/lib/reservations";
 import * as routes from "@/lib/routes";
@@ -38,9 +39,7 @@ export function SiteHeader() {
   return (
     <header className="flex items-center justify-between gap-4 border-b border-ink-line px-[1.375rem] py-3 sm:px-8">
       <Link href="/" className="flex items-center gap-2.5">
-        <span className="flex h-6 w-6 items-center justify-center rounded-[0.45rem] bg-ink text-xs font-bold text-paper">
-          {site.name.charAt(0)}
-        </span>
+        <BrandMark size={24} />
         <span className="text-sm font-bold tracking-[-0.01em]">{site.name}</span>
       </Link>
 

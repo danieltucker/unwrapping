@@ -5,7 +5,10 @@ import { SignInForm } from "@/components/auth-forms";
 import { Card } from "@/components/ui";
 import { getCurrentUser } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = {
+  title: "Sign in",
+  robots: { index: false, follow: false },
+};
 
 export default async function SignInPage() {
   if (await getCurrentUser()) redirect("/");

@@ -138,6 +138,35 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   );
 }
 
+/**
+ * The logo: a ribbon still curling after it has been pulled off a present.
+ *
+ * The geometry is the same path as `src/app/icon.svg`, so the browser tab and
+ * the header show one mark rather than two that nearly match. The colors come
+ * from the theme rather than from the file, which is why this is drawn inline
+ * instead of served as an image.
+ */
+export function BrandMark({ size = 24, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect width="64" height="64" rx="16" className="fill-violet" />
+      <path
+        d="M31 33.5a3.5 3.5 0 0 1 3.5-3.5a7 7 0 0 1 7 7a10.5 10.5 0 0 1-10.5 10.5a14 14 0 0 1-14-14a17.5 17.5 0 0 1 17.5-17.5a21 21 0 0 1 19 12"
+        fill="none"
+        className="stroke-paper"
+        strokeWidth={6.5}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 /** The eye-off mark that carries the surprise guarantee everywhere it appears. */
 export function EyeOffIcon({
   size = 18,
@@ -248,6 +277,29 @@ export function CloseIcon({ size = 15, className }: { size?: number; className?:
     >
       <path d="M6 6l12 12" />
       <path d="M18 6 6 18" />
+    </svg>
+  );
+}
+
+/** Two figures: a gift several people are going in on, rather than one buyer. */
+export function UsersIcon({ size = 18, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 19.5a5.5 5.5 0 0 1 11 0" />
+      <path d="M16 5.6a3.2 3.2 0 0 1 0 6.3" />
+      <path d="M17.8 14.4a5.5 5.5 0 0 1 2.7 4.5" />
     </svg>
   );
 }

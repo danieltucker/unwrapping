@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
+import { secureCookies } from "@/lib/origin";
 
 const SESSION_COOKIE = "unwrap_session";
 const GUEST_COOKIE = "unwrap_guest";
@@ -24,7 +25,10 @@ function secret(): string {
 
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
+  // Follows the origin rather than NODE_ENV: an instance served over plain http
+  // on someone's own network would otherwise set a Secure cookie the browser
+  // throws away, which reads as a sign-in button that does nothing.
+  secure: secureCookies,
   sameSite: "lax" as const,
   path: "/",
 };
