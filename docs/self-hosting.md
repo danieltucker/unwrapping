@@ -87,7 +87,8 @@ offers one:
 
 - **Image**: `ghcr.io/<you>/unwrap:latest`
 - **Port**: container `3000` to whatever host port you like
-- **Environment**: `SESSION_SECRET`, `SITE_URL`
+- **Environment**: `SESSION_SECRET`, `SITE_URL`, and `ADMIN_EMAILS` if you want
+  `/admin` (see below)
 - **Storage**: host path `/mnt/tank/apps/unwrap/data` mounted at `/app/data`
 
 The image already sets `NODE_ENV`, `HOSTNAME`, `PORT` and `DATABASE_URL`; leave

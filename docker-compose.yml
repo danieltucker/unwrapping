@@ -30,6 +30,11 @@ services:
       # link previews, and it decides whether cookies are marked Secure: over
       # plain http say so here, or sign-in will appear to do nothing.
       SITE_URL: ${SITE_URL:-http://localhost:3000}
+      # Who may open /admin, where every account, list and uploaded photo can
+      # be deleted outright. Comma-separated email addresses, matched against
+      # the address an account signed up with. Optional: empty means nobody,
+      # and the screen 404s for everyone, including you.
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     volumes:
       # The database and the uploaded gift photos. On TrueNAS, point the left
       # side at a dataset, e.g. /mnt/tank/apps/unwrap/data.
