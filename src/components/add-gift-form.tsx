@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import {
   addGift,
@@ -30,15 +29,40 @@ const EMPTY_MANUAL: ScrapeResult = {
   error: null,
 };
 
+type FormKeys = { handle: string; listKey: string };
+
+/**
+ * Adding a gift, in as many goes as it takes.
+ *
+ * Start over is a remount rather than a state reset: the step you are on is
+ * partly the form action's own state, which nothing here can put back, so
+ * "start over" used to leave a scraped result on screen and read as a dead
+ * button. A new instance is unambiguously a blank one.
+ */
 export function AddGiftForm({
   handle,
   listKey,
-  addPath,
-}: {
-  handle: string;
-  listKey: string;
-  addPath: string;
-}) {
+  onDone,
+}: FormKeys & { onDone: () => void }) {
+  const [attempt, setAttempt] = useState(0);
+
+  return (
+    <AddGiftFlow
+      key={attempt}
+      handle={handle}
+      listKey={listKey}
+      onDone={onDone}
+      onStartOver={() => setAttempt((count) => count + 1)}
+    />
+  );
+}
+
+function AddGiftFlow({
+  handle,
+  listKey,
+  onDone,
+  onStartOver,
+}: FormKeys & { onDone: () => void; onStartOver: () => void }) {
   const [preview, previewAction, fetching] = useActionState<PreviewState, FormData>(
     previewGift,
     {},
@@ -54,19 +78,19 @@ export function AddGiftForm({
       <ConfirmGift
         handle={handle}
         listKey={listKey}
-        addPath={addPath}
         result={result}
         kind={manual ? kind : "thing"}
-        onStartOver={() => setManual(null)}
+        onDone={onDone}
+        onStartOver={onStartOver}
       />
     );
   }
 
   return (
     <div className="p-[26px]">
-      <h1 className="mb-[6px] font-display text-[1.75rem] leading-[1.1] tracking-[-.7px]">
+      <h2 className="mb-[6px] font-display text-[1.75rem] leading-[1.1] tracking-[-.7px]">
         Add a gift
-      </h1>
+      </h2>
       <p className="mb-5 text-sm leading-[1.65] text-ink-76">
         Paste a link from any shop and we&rsquo;ll fetch the rest.
       </p>
@@ -183,16 +207,14 @@ function Fetching() {
 function ConfirmGift({
   handle,
   listKey,
-  addPath,
   result,
   kind,
+  onDone,
   onStartOver,
-}: {
-  handle: string;
-  listKey: string;
-  addPath: string;
+}: FormKeys & {
   result: ScrapeResult;
   kind: ItemKind;
+  onDone: () => void;
   onStartOver: () => void;
 }) {
   const [state, action, pending] = useActionState<AddGiftState, FormData>(addGift, {});
@@ -214,6 +236,13 @@ function ConfirmGift({
   const idea = kind === "idea";
 
   const priceValue = centsToInput(result.priceCents);
+
+  // The gift is on the list and the editor behind has already been told to
+  // refresh, so there is nothing left for this panel to be.
+  useEffect(() => {
+    if (state.ok) onDone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.ok]);
 
   return (
     <>
@@ -383,13 +412,13 @@ function ConfirmGift({
           <Button type="submit" disabled={pending} className="flex-1">
             {pending ? "Adding…" : "Add to list"}
           </Button>
-          <Link
-            href={addPath}
+          <button
+            type="button"
             onClick={onStartOver}
-            className="rounded-pill border border-ink-line-strong px-[17px] py-3 text-sm font-semibold"
+            className="rounded-pill border border-ink-line-strong px-[17px] py-3 text-sm font-semibold transition-colors duration-150 hover:bg-ink/[.03]"
           >
             Start over
-          </Link>
+          </button>
         </div>
       </form>
 

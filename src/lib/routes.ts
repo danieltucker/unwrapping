@@ -36,17 +36,12 @@ export function manageList(list: ListRef, ownerHandle: string | null): string {
   return `${publicList(list, ownerHandle)}/manage`;
 }
 
-export function addGift(list: ListRef, ownerHandle: string | null): string {
-  return `${manageList(list, ownerHandle)}/add`;
-}
-
-export function editGift(
-  list: ListRef,
-  ownerHandle: string | null,
-  itemId: string,
-): string {
-  return `${manageList(list, ownerHandle)}/items/${itemId}/edit`;
-}
+/*
+ * Adding and editing a gift have no URLs of their own: both are dialogs over
+ * the editor, so the page they act on is the page you are already on. Their
+ * server actions still live under manage/add and manage/items/[id]/edit, which
+ * is where you would expect to find them; those folders just have no page.
+ */
 
 export function shareList(list: ListRef, ownerHandle: string | null): string {
   return `${manageList(list, ownerHandle)}/share`;

@@ -12,7 +12,12 @@ import { sourceDomain } from "@/lib/outbound";
 import * as routes from "@/lib/routes";
 import { parsePriceToCents, scrapeProduct } from "@/lib/scrape";
 
-export type EditItemState = { error?: string; message?: string };
+/**
+ * `ok` rather than a redirect: this form is a dialog over the editor, so
+ * finishing means closing the panel and letting the list behind it refresh,
+ * not going anywhere.
+ */
+export type EditItemState = { ok?: boolean; error?: string; message?: string };
 
 /** Loads an item, proving it belongs to a list this viewer owns. */
 async function ownedItem(
@@ -106,7 +111,7 @@ export async function updateItem(
     .where(eq(items.id, itemId));
 
   refreshList(owned);
-  redirect(routes.manageList(owned.list, owned.ownerHandle));
+  return { ok: true };
 }
 
 export async function deleteItem(
@@ -122,7 +127,7 @@ export async function deleteItem(
   await db.delete(items).where(eq(items.id, itemId));
 
   refreshList(owned);
-  redirect(routes.manageList(owned.list, owned.ownerHandle));
+  return { ok: true };
 }
 
 /**
@@ -168,7 +173,8 @@ export async function refetchItem(
     })
     .where(eq(items.id, itemId));
 
-  revalidatePath(routes.editGift(owned.list, owned.ownerHandle, itemId));
+  // The form reads the gift from the editor behind it, so refreshing the list
+  // is what puts a re-read title and its new photos on screen.
   refreshList(owned);
 
   return {

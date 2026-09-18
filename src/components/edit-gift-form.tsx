@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import {
   deleteItem,
@@ -25,7 +25,8 @@ export function EditGiftForm({
   item,
   handle,
   listKey,
-}: { item: Item } & ListKeys) {
+  onDone,
+}: { item: Item; onDone: () => void } & ListKeys) {
   const [state, action, pending] = useActionState<EditItemState, FormData>(
     updateItem,
     {},
@@ -48,6 +49,13 @@ export function EditGiftForm({
     setLastFromServer(item.selectedImageIndex);
     setSelected(item.selectedImageIndex);
   }
+
+  // Saved, so the panel has nothing left to show. The editor behind it has
+  // already been told to refresh.
+  useEffect(() => {
+    if (state.ok) onDone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.ok]);
 
   return (
     <div className="p-[26px]">
@@ -197,7 +205,7 @@ export function EditGiftForm({
       {/* Repair and destruction both live down here, out of the way. */}
       <div className="mt-6 flex flex-wrap items-start justify-between gap-4 border-t border-ink-line pt-5">
         <RefetchLink item={item} handle={handle} listKey={listKey} />
-        <DeleteItem item={item} handle={handle} listKey={listKey} />
+        <DeleteItem item={item} handle={handle} listKey={listKey} onDone={onDone} />
       </div>
     </div>
   );
@@ -236,12 +244,25 @@ function RefetchLink({ item, handle, listKey }: { item: Item } & ListKeys) {
   );
 }
 
-function DeleteItem({ item, handle, listKey }: { item: Item } & ListKeys) {
+function DeleteItem({
+  item,
+  handle,
+  listKey,
+  onDone,
+}: { item: Item; onDone: () => void } & ListKeys) {
   const [state, action, pending] = useActionState<EditItemState, FormData>(
     deleteItem,
     {},
   );
   const [confirming, setConfirming] = useState(false);
+
+  // The gift this panel is about no longer exists. The row it opened from is on
+  // its way out too, but close explicitly rather than trusting a dialog to take
+  // its backdrop with it when React pulls it out of the document.
+  useEffect(() => {
+    if (state.ok) onDone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.ok]);
 
   return (
     <div className="min-w-0">

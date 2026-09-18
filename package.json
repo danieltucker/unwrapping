@@ -13,7 +13,8 @@
     "test": "npm run test:parse && npm run test:handles",
     "test:parse": "node scripts/test-parse.mts",
     "test:handles": "node scripts/test-handles.mts",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm test",
+    "scrape": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/scrape-url.mts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

@@ -1,42 +1,34 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { reorderGifts } from "@/app/lists/[handle]/[slug]/manage/actions";
+import { EditGiftDialog } from "@/components/edit-gift-dialog";
 import { FundingBar } from "@/components/funding";
 import { fundingLine } from "@/lib/funding";
 import { formatPrice } from "@/config/site";
-import type { ItemKind } from "@/db/schema";
+import type { Item } from "@/db/schema";
 
 export type EditorRow = {
-  id: string;
-  kind: ItemKind;
-  title: string;
-  image: string | null;
-  emoji: string | null;
-  sourceDomain: string | null;
-  priceCents: number | null;
-  quantity: number;
-  isMostWanted: boolean;
-  isGroupGift: boolean;
-  goalCents: number | null;
+  /**
+   * The gift itself, whole: the edit panel opens over this row rather than on a
+   * page of its own, so everything its form needs has to be here already.
+   */
+  item: Item;
   raisedCents: number;
   contributorCount: number;
-  needsAttention: string | null;
   /** Null on a surprise list, where the owner may not know. Never 0 by accident. */
   claimedCount: number | null;
   boughtCount: number | null;
-  editHref: string;
 };
 
 type Filter = "all" | "wanted" | "photo" | "group";
 
 const MATCHES: Record<Filter, (row: EditorRow) => boolean> = {
   all: () => true,
-  wanted: (row) => row.isMostWanted,
-  photo: (row) => row.needsAttention === "no-photo",
-  group: (row) => row.isGroupGift,
+  wanted: (row) => row.item.isMostWanted,
+  photo: (row) => row.item.needsAttention === "no-photo",
+  group: (row) => row.item.isGroupGift,
 };
 
 const FILTER_LABELS: Record<Filter, string> = {
@@ -74,7 +66,7 @@ export function GiftRows({
   // one on screen. A drag shows immediately and the server confirms it a moment
   // later, so the order is adopted only when the server's own answer changes
   // (an add, a delete, or another tab), never on every render.
-  const serverOrder = rows.map((row) => row.id).join(",");
+  const serverOrder = rows.map((row) => row.item.id).join(",");
   const [order, setOrder] = useState(serverOrder);
   const [lastFromServer, setLastFromServer] = useState(serverOrder);
 
@@ -83,7 +75,7 @@ export function GiftRows({
     setOrder(serverOrder);
   }
 
-  const byId = new Map(rows.map((row) => [row.id, row]));
+  const byId = new Map(rows.map((row) => [row.item.id, row]));
   const ordered = order
     .split(",")
     .map((id) => byId.get(id))
@@ -94,7 +86,7 @@ export function GiftRows({
 
   /** Moves a row on screen only; a drag does this for every row it crosses. */
   function preview(id: string, to: number) {
-    const ids = ordered.map((row) => row.id);
+    const ids = ordered.map((row) => row.item.id);
     const from = ids.indexOf(id);
     if (from === -1 || to < 0 || to >= ids.length || to === from) return;
 
@@ -114,7 +106,7 @@ export function GiftRows({
   }
 
   function moveBy(id: string, offset: number) {
-    const ids = ordered.map((row) => row.id);
+    const ids = ordered.map((row) => row.item.id);
     const from = ids.indexOf(id);
     const to = from + offset;
     if (from === -1 || to < 0 || to >= ids.length) return;
@@ -172,22 +164,24 @@ export function GiftRows({
       <ul className="flex flex-col gap-2">
         {visible.map((row, index) => (
           <GiftRow
-            key={row.id}
+            key={row.item.id}
             row={row}
+            handle={handle}
+            listKey={listKey}
             position={index}
             total={visible.length}
             canReorder={canReorder}
-            dragging={dragId === row.id}
-            onDragStart={() => setDragId(row.id)}
+            dragging={dragId === row.item.id}
+            onDragStart={() => setDragId(row.item.id)}
             onDragEnd={() => {
               setDragId(null);
-              persist(ordered.map((item) => item.id));
+              persist(ordered.map((entry) => entry.item.id));
             }}
             // The row being dragged across gives up its place straight away.
             onDragOver={() => {
-              if (dragId && dragId !== row.id) preview(dragId, index);
+              if (dragId && dragId !== row.item.id) preview(dragId, index);
             }}
-            onMove={(offset) => moveBy(row.id, offset)}
+            onMove={(offset) => moveBy(row.item.id, offset)}
           />
         ))}
       </ul>
@@ -203,6 +197,8 @@ export function GiftRows({
 
 function GiftRow({
   row,
+  handle,
+  listKey,
   position,
   total,
   canReorder,
@@ -213,6 +209,8 @@ function GiftRow({
   onMove,
 }: {
   row: EditorRow;
+  handle: string;
+  listKey: string;
   position: number;
   total: number;
   canReorder: boolean;
@@ -222,7 +220,8 @@ function GiftRow({
   onDragOver: () => void;
   onMove: (offset: number) => void;
 }) {
-  const needsPhoto = row.needsAttention === "no-photo";
+  const needsPhoto = row.item.needsAttention === "no-photo";
+  const photo = row.item.images[row.item.selectedImageIndex] ?? row.item.images[0];
 
   return (
     <li
@@ -242,7 +241,7 @@ function GiftRow({
       {canReorder ? (
         <button
           type="button"
-          aria-label={`Reorder ${row.title}. Position ${position + 1} of ${total}. Use the arrow keys to move it.`}
+          aria-label={`Reorder ${row.item.title}. Position ${position + 1} of ${total}. Use the arrow keys to move it.`}
           onKeyDown={(event) => {
             if (event.key === "ArrowUp") {
               event.preventDefault();
@@ -260,12 +259,12 @@ function GiftRow({
       ) : null}
 
       <div className="h-[52px] w-11 shrink-0 overflow-hidden rounded-[7px] bg-ink/[.05]">
-        {row.image ? (
+        {photo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={row.image} alt="" className="h-full w-full object-cover" />
-        ) : row.emoji ? (
+          <img src={photo} alt="" className="h-full w-full object-cover" />
+        ) : row.item.emoji ? (
           <span className="flex h-full items-center justify-center text-xl leading-none">
-            {row.emoji}
+            {row.item.emoji}
           </span>
         ) : (
           <span className="flex h-full items-center justify-center text-center text-2xs leading-tight text-ink-62">
@@ -278,29 +277,29 @@ function GiftRow({
 
       <div className="min-w-0 flex-1">
         <div className="mb-[3px] flex flex-wrap items-center gap-2">
-          <span className="text-sm font-semibold">{row.title}</span>
-          {row.kind === "idea" ? <Badge tone="neutral">Idea</Badge> : null}
-          {row.isMostWanted ? <Badge tone="violet">Most wanted</Badge> : null}
-          {row.isGroupGift ? (
+          <span className="text-sm font-semibold">{row.item.title}</span>
+          {row.item.kind === "idea" ? <Badge tone="neutral">Idea</Badge> : null}
+          {row.item.isMostWanted ? <Badge tone="violet">Most wanted</Badge> : null}
+          {row.item.isGroupGift ? (
             <Badge tone="rose">
               {row.contributorCount > 0
                 ? `Group gift · ${row.contributorCount} in`
                 : "Group gift"}
             </Badge>
           ) : null}
-          {row.quantity > 1 ? <Badge tone="neutral">Qty {row.quantity}</Badge> : null}
+          {row.item.quantity > 1 ? <Badge tone="neutral">Qty {row.item.quantity}</Badge> : null}
           <ClaimBadge row={row} />
         </div>
 
-        {row.isGroupGift && !needsPhoto ? (
+        {row.item.isGroupGift && !needsPhoto ? (
           <div className="max-w-[280px]">
             <FundingBar
               raisedCents={row.raisedCents}
-              goalCents={row.goalCents}
+              goalCents={row.item.goalCents}
               className="mb-[5px]"
             />
             <p className="text-xs text-ink-72">
-              {fundingLine(row.raisedCents, row.goalCents)}
+              {fundingLine(row.raisedCents, row.item.goalCents)}
             </p>
           </div>
         ) : (
@@ -309,7 +308,7 @@ function GiftRow({
           >
             {needsPhoto
               ? "No photo found. Items with a photo get claimed far more often"
-              : row.kind === "idea"
+              : row.item.kind === "idea"
                 ? // No link, no price and no quantity to report, so the line
                   // says the one thing an owner might want: how many guests
                   // have gone this way. Null on a surprise list.
@@ -317,23 +316,25 @@ function GiftRow({
                     ? "A direction to shop in, not one present"
                     : `${row.claimedCount} ${row.claimedCount === 1 ? "person is" : "people are"} going this way`
                 : [
-                    row.sourceDomain ?? "Added by hand · no link",
-                    `qty ${row.quantity}`,
+                    row.item.sourceDomain ?? "Added by hand · no link",
+                    `qty ${row.item.quantity}`,
                   ].join(" · ")}
           </p>
         )}
       </div>
 
       <span className="text-base font-semibold">
-        {row.kind === "idea"
+        {row.item.kind === "idea"
           ? ""
-          : row.priceCents === null
+          : row.item.priceCents === null
             ? "-"
-            : formatPrice(row.priceCents)}
+            : formatPrice(row.item.priceCents)}
       </span>
 
-      <Link
-        href={row.editHref}
+      <EditGiftDialog
+        item={row.item}
+        handle={handle}
+        listKey={listKey}
         className={
           needsPhoto
             ? "rounded-pill bg-ink px-4 pt-[7px] pb-[5px] text-xs font-semibold text-paper transition-colors duration-150 hover:bg-ink/90"
@@ -341,7 +342,7 @@ function GiftRow({
         }
       >
         {needsPhoto ? "Fix it" : "Edit"}
-      </Link>
+      </EditGiftDialog>
     </li>
   );
 }
@@ -360,7 +361,7 @@ function ClaimBadge({ row }: { row: EditorRow }) {
 
   return (
     <Badge tone="pine">
-      {row.quantity > 1 ? `${row.claimedCount} of ${row.quantity} taken` : "Taken"}
+      {row.item.quantity > 1 ? `${row.claimedCount} of ${row.item.quantity} taken` : "Taken"}
     </Badge>
   );
 }

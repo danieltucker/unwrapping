@@ -55,7 +55,6 @@ export async function uploadPhoto(
       })
       .where(eq(items.id, itemId));
 
-    revalidatePath(routes.editGift(list, ownerHandle, itemId));
     revalidatePath(routes.manageList(list, ownerHandle));
     revalidatePath(routes.publicList(list, ownerHandle));
   }

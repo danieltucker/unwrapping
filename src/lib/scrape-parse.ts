@@ -12,9 +12,39 @@ export type ParsedProduct = {
   priceCents: number | null;
   currency: string | null;
   images: string[];
+  /**
+   * Which piece of markup each field was read out of, e.g. "og:title". Null
+   * where nothing matched at all.
+   *
+   * A scrape that comes back half-empty is otherwise silent about *why*, and
+   * the answer is nearly always one of two things: the shop renders its product
+   * data in the browser rather than in the HTML, or it served us a page that
+   * isn't the product at all. Knowing which field fell through to which
+   * fallback is the difference between the two, so the log carries it.
+   */
+  via: { title: string | null; price: string | null; images: string | null };
 };
 
 const MAX_IMAGES = 6;
+
+/**
+ * The first candidate with something in it, and the name of where it came from.
+ *
+ * Written out rather than left as a `??` chain because the name is half the
+ * point: see ParsedProduct.via. It also treats an empty string as nothing,
+ * which a `??` chain does not — `$("h1").text()` on a page with no h1 returns
+ * "" and used to swallow every fallback behind it.
+ */
+function first<T>(
+  candidates: readonly (readonly [string, T | null | undefined])[],
+): { value: T | null; via: string | null } {
+  for (const [via, value] of candidates) {
+    if (value === null || value === undefined) continue;
+    if (typeof value === "string" && value.trim() === "") continue;
+    return { value, via };
+  }
+  return { value: null, via: null };
+}
 
 /** The bare domain shown on a gift card, e.g. "kinto-europe.com". */
 export function sourceDomain(url: string | null | undefined): string | null {
@@ -349,46 +379,59 @@ export function parseProduct(html: string, baseUrl: string): ParsedProduct {
   const offer = product ? firstOffer(product) : null;
   const site = isAmazon(hostname) ? amazonSignals($) : {};
 
-  const title =
-    meta('meta[property="og:title"]') ??
-    meta('meta[name="twitter:title"]') ??
-    (typeof product?.name === "string" ? product.name.trim() : null) ??
-    site.title ??
-    $("h1").first().text().trim() ??
-    $("title").first().text().trim() ??
-    null;
+  const title = first<string>([
+    ["og:title", meta('meta[property="og:title"]')],
+    ["twitter:title", meta('meta[name="twitter:title"]')],
+    ["json-ld", typeof product?.name === "string" ? product.name.trim() : null],
+    ["site markup", site.title],
+    ["h1", $("h1").first().text().trim()],
+    ["<title>", $("title").first().text().trim()],
+  ]);
 
-  const rawPrice =
-    meta('meta[property="product:price:amount"]') ??
-    meta('meta[property="og:price:amount"]') ??
-    (offer?.price as string | undefined) ??
-    $('[itemprop="price"]').first().attr("content") ??
-    site.rawPrice ??
-    null;
+  const rawPrice = first<string>([
+    ["product:price:amount", meta('meta[property="product:price:amount"]')],
+    ["og:price:amount", meta('meta[property="og:price:amount"]')],
+    [
+      "json-ld offer",
+      typeof offer?.price === "string" || typeof offer?.price === "number"
+        ? String(offer.price)
+        : null,
+    ],
+    ["itemprop=price", $('[itemprop="price"]').first().attr("content")],
+    ["site markup", site.rawPrice],
+  ]);
 
-  const currency =
-    meta('meta[property="product:price:currency"]') ??
-    meta('meta[property="og:price:currency"]') ??
-    (typeof offer?.priceCurrency === "string" ? offer.priceCurrency : null) ??
-    currencyFromSymbol(site.rawPrice ?? null);
+  const currency = first<string>([
+    ["product:price:currency", meta('meta[property="product:price:currency"]')],
+    ["og:price:currency", meta('meta[property="og:price:currency"]')],
+    [
+      "json-ld offer",
+      typeof offer?.priceCurrency === "string" ? offer.priceCurrency : null,
+    ],
+    ["price symbol", currencyFromSymbol(site.rawPrice ?? null)],
+  ]);
 
-  const candidates = [
+  const candidates: readonly (readonly [string, string | undefined])[] = [
+    // toArray, not cheerio's own .map().get(): that one flattens an array the
+    // callback returns, which would tear these pairs apart into loose strings.
     ...$('meta[property="og:image"]')
-      .map((_, element) => $(element).attr("content"))
-      .get(),
-    meta('meta[name="twitter:image"]'),
+      .toArray()
+      .map((element) => ["og:image", $(element).attr("content")] as const),
+    ["twitter:image", meta('meta[name="twitter:image"]') ?? undefined],
     ...(Array.isArray(product?.image)
       ? (product.image as unknown[]).filter((i): i is string => typeof i === "string")
       : typeof product?.image === "string"
         ? [product.image]
-        : []),
-    ...(site.images ?? []),
-    $('link[rel="image_src"]').attr("href"),
+        : []
+    ).map((url) => ["json-ld", url] as const),
+    ...(site.images ?? []).map((url) => ["site markup", url] as const),
+    ["link[rel=image_src]", $('link[rel="image_src"]').attr("href")],
   ];
 
   const images: string[] = [];
   const seen = new Set<string>();
-  for (const candidate of candidates) {
+  let imagesVia: string | null = null;
+  for (const [via, candidate] of candidates) {
     if (!candidate) continue;
     try {
       const absolute = new URL(candidate, baseUrl).toString();
@@ -396,6 +439,7 @@ export function parseProduct(html: string, baseUrl: string): ParsedProduct {
       if (seen.has(key)) continue;
       seen.add(key);
       images.push(absolute);
+      imagesVia ??= via;
     } catch {
       // Skip anything that isn't a resolvable URL.
     }
@@ -403,9 +447,10 @@ export function parseProduct(html: string, baseUrl: string): ParsedProduct {
   }
 
   return {
-    title: title || null,
-    priceCents: parsePriceToCents(rawPrice),
-    currency: currency?.toUpperCase() ?? null,
+    title: title.value,
+    priceCents: parsePriceToCents(rawPrice.value),
+    currency: currency.value?.toUpperCase() ?? null,
     images,
+    via: { title: title.via, price: rawPrice.via, images: imagesVia },
   };
 }

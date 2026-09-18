@@ -145,7 +145,52 @@ a migration you have not seen run.
 | Link previews and share links show the wrong address | `SITE_URL` is unset or stale. It defaults to the public domain, which is wrong for your instance. |
 | Container restarts in a loop | Read the logs first: `docker compose logs`. A missing `SESSION_SECRET` is the usual answer, and it fails loudly on purpose. |
 | Won't start, read-only filesystem error | Comment out `read_only: true` in `docker-compose.yml` and open an issue with the path it complained about. |
-| Pasting a shop link finds nothing | The container needs outbound internet access to read product pages. It does not need anything inbound. |
+| Pasting a shop link finds nothing | The container needs outbound internet access to read product pages. It does not need anything inbound. Then read the scrape log below, which says which of the two it was. |
+
+## When a shop link won't fill in
+
+Every attempt to read a product page writes one line to the server log, whether
+it worked or not:
+
+```bash
+docker compose logs -f | grep "\[scrape\]"
+```
+
+```
+[scrape] ok dur=2306ms host=amazon.com status=200 bytes=2862145 title=site markup price=site markup/4999 images=site markup/1 url=https://www.amazon.com/dp/B0DCN2KVKV
+[scrape] blocked dur=430ms host=bestbuy.com cause=ECONNRESET url=https://www.bestbuy.com/product/...
+```
+
+The first word is what happened. `ok` means we read the page; `title=`, `price=`
+and `images=` then name the markup each field came out of, so `title=og:title
+price=none/none` says the shop publishes a title and no price rather than that
+we failed to look. Anything else is the shop, not the parser:
+
+| Outcome | What it means |
+|---|---|
+| `blocked` | The shop dropped the connection before answering. Bot protection at their edge — it refuses the connection itself, so no header or user agent changes it. Best Buy, Walmart and Target all do this. The gift has to be written in by hand, and the form says so. |
+| `timeout` | No answer in 8 seconds. Worth one retry; a shop that stalls every time is refusing us politely. |
+| `http-error` | It answered with a status, not a page. `403`/`429` is being turned away, `404` is usually a link that has expired. |
+| `unreachable` | DNS, TLS or the network — check the container has outbound access. |
+| `no-link` | Nothing in what was pasted parsed as an address. |
+
+To work on one yourself, run the same code path from a checkout:
+
+```bash
+npm run scrape -- "https://www.example.com/p/thing"
+```
+
+That prints the whole trace and what the Add a gift form would be filled in
+with. `SCRAPE_DEBUG=1` additionally logs the full trace as JSON and keeps each
+page body under `data/scrapes/`, which you can then re-parse offline as many
+times as you like without going back to the shop:
+
+```bash
+node scripts/test-parse.mts data/scrapes/1758…-example.com.html "https://www.example.com/p/thing"
+```
+
+Parsing itself lives in `src/lib/scrape-parse.ts`, and it is pure — no network,
+no framework — so a new shop is a selector and a test case.
 
 ## What this setup does not do
 

@@ -1,7 +1,7 @@
 import { asc, eq } from "drizzle-orm";
-import Link from "next/link";
 import QRCode from "qrcode";
 
+import { AddGiftDialog } from "@/components/add-gift-dialog";
 import { GiftRows, type EditorRow } from "@/components/gift-rows";
 import { ListSettings } from "@/components/list-settings";
 import { ShareDialog } from "@/components/share-dialog";
@@ -66,24 +66,12 @@ export default async function EditorPage({
   });
 
   const rows: EditorRow[] = gifts.map((gift) => ({
-    id: gift.id,
-    kind: gift.kind,
-    title: gift.title,
-    image: gift.images[gift.selectedImageIndex] ?? gift.images[0] ?? null,
-    emoji: gift.emoji,
-    sourceDomain: gift.sourceDomain,
-    priceCents: gift.priceCents,
-    quantity: gift.quantity,
-    isMostWanted: gift.isMostWanted,
-    isGroupGift: gift.isGroupGift,
-    goalCents: gift.goalCents,
+    item: gift,
     raisedCents: funding.find((f) => f.itemId === gift.id)?.raisedCents ?? 0,
     contributorCount: funding.find((f) => f.itemId === gift.id)?.contributorCount ?? 0,
-    needsAttention: gift.needsAttention,
     // Null on a surprise list: the row is not allowed to know.
     claimedCount: status?.get(gift.id)?.claimedCount ?? (status ? 0 : null),
     boughtCount: status?.get(gift.id)?.boughtCount ?? (status ? 0 : null),
-    editHref: routes.editGift(list, ownerHandle, gift.id),
   }));
 
   const eventLine = [formatEventDate(list.eventDate), relativeEvent(list.eventDate)]
@@ -175,7 +163,9 @@ export default async function EditorPage({
           <ShareDialog>
             <SharePanel shareUrl={shareUrl} canonical={canonical} qrSvg={qrSvg} />
           </ShareDialog>
-          <ButtonLink href={routes.addGift(list, ownerHandle)}>+ Add gift</ButtonLink>
+          <AddGiftDialog handle={handle} listKey={slug}>
+            + Add gift
+          </AddGiftDialog>
         </div>
       </header>
 
@@ -199,9 +189,10 @@ export default async function EditorPage({
       </div>
 
       {rows.length === 0 ? (
-        <Link
-          href={routes.addGift(list, ownerHandle)}
-          className="block rounded-[12px] border border-dashed border-ink-line-strong px-6 py-12 text-center transition-colors duration-150 hover:bg-ink/[.02]"
+        <AddGiftDialog
+          handle={handle}
+          listKey={slug}
+          className="block w-full rounded-[12px] border border-dashed border-ink-line-strong px-6 py-12 text-center transition-colors duration-150 hover:bg-ink/[.02]"
         >
           <span className="mb-2 block text-base font-semibold">
             Nothing on the list yet
@@ -209,7 +200,7 @@ export default async function EditorPage({
           <span className="block text-sm leading-[1.7] text-ink-72">
             Paste a link from any shop and we&rsquo;ll fill in the rest.
           </span>
-        </Link>
+        </AddGiftDialog>
       ) : (
         <GiftRows rows={rows} handle={handle} listKey={slug} />
       )}

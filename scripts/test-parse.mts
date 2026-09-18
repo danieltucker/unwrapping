@@ -110,11 +110,18 @@ check("javascript: url rejected", normalizeUrl("javascript:alert(1)"), null);
 check("bare word rejected", normalizeUrl("wat"), null);
 
 // --- Saved page, when one is supplied -------------------------------------
+//
+// With a URL of its own, the page is somebody's bug report rather than the
+// fixture: parse it against the address it came from and report, but assert
+// nothing, since we have no idea what it is meant to contain. `via` is the
+// thing to read there — it says which markup each field was found in, and a
+// row of "none" means the shop renders its product data in the browser.
 const savedPage = process.argv[2];
+const savedPageUrl = process.argv[3];
 if (savedPage) {
   const parsed = parseProduct(
     readFileSync(savedPage, "utf8"),
-    "https://www.amazon.com/dp/B0DCN2KVKV",
+    savedPageUrl ?? "https://www.amazon.com/dp/B0DCN2KVKV",
   );
 
   console.log("\nParsed from saved page:");
@@ -122,10 +129,12 @@ if (savedPage) {
     JSON.stringify({ ...parsed, images: parsed.images.slice(0, 3) }, null, 2),
   );
 
-  check("title found", (parsed.title?.length ?? 0) > 10, true);
-  check("price found", parsed.priceCents, 4999);
-  check("currency found", parsed.currency, "USD");
-  check("at least one image", parsed.images.length > 0, true);
+  if (!savedPageUrl) {
+    check("title found", (parsed.title?.length ?? 0) > 10, true);
+    check("price found", parsed.priceCents, 4999);
+    check("currency found", parsed.currency, "USD");
+    check("at least one image", parsed.images.length > 0, true);
+  }
 }
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);

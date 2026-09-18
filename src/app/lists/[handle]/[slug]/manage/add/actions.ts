@@ -1,14 +1,14 @@
 "use server";
 
 import { eq, sql } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
 import { items, type ItemKind } from "@/db/schema";
 import { parseGiftEmoji } from "@/lib/emoji";
 import { requireOwnedList } from "@/lib/list-access";
 import { sourceDomain } from "@/lib/outbound";
-import { manageList } from "@/lib/routes";
+import * as routes from "@/lib/routes";
 import { parsePriceToCents, scrapeProduct, type ScrapeResult } from "@/lib/scrape";
 
 export type PreviewState = { result?: ScrapeResult; error?: string };
@@ -30,7 +30,12 @@ export async function previewGift(
   return { result: await scrapeProduct(url) };
 }
 
-export type AddGiftState = { error?: string };
+/**
+ * `ok` rather than a redirect: the form is a dialog over the editor, so
+ * finishing means closing the panel and letting the list behind it refresh,
+ * not going anywhere.
+ */
+export type AddGiftState = { ok?: boolean; error?: string };
 
 export async function addGift(
   _previous: AddGiftState,
@@ -136,5 +141,7 @@ export async function addGift(
       kind === "thing" && images.length === 0 && !emoji ? "no-photo" : null,
   });
 
-  redirect(manageList(list, ownerHandle));
+  revalidatePath(routes.manageList(list, ownerHandle));
+  revalidatePath(routes.publicList(list, ownerHandle));
+  return { ok: true };
 }
