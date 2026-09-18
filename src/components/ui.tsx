@@ -131,6 +131,12 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
       className={cx(
         "w-full rounded-control border border-ink-line-strong bg-surface px-[14px] py-3",
         "text-sm leading-[1.65] text-ink/85 placeholder:text-ink-62 focus-ring",
+        // `rows` counts lines, and on a phone the same sentence needs one more
+        // of them: the text is 16px there so it doesn't zoom the page, and the
+        // column is narrower. Every caller asks for two rows, so a two-line
+        // placeholder arrives cut off through the middle of its third line.
+        // Three lines and the padding, measured off the element's own text.
+        "max-sm:min-h-[calc(4.95em+1.5rem+2px)]",
         className,
       )}
       {...props}

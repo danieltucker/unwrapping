@@ -87,7 +87,7 @@ export function ReserveDialog({
             <button
               type="button"
               onClick={() => dialog.current?.close()}
-              className="w-full text-center text-sm font-semibold text-ink-72"
+              className="min-h-11 w-full text-center text-sm font-semibold text-ink-72"
             >
               Not now
             </button>
@@ -147,7 +147,7 @@ export function ReserveDialog({
           <button
             type="button"
             onClick={() => dialog.current?.close()}
-            className="w-full text-center text-sm font-semibold text-ink-72"
+            className="min-h-11 w-full text-center text-sm font-semibold text-ink-72"
           >
             Never mind
           </button>

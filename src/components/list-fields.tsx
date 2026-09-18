@@ -125,7 +125,9 @@ export function ListIdentityFields({
                   setEmoji(option);
                   setPickedEmoji(true);
                 }}
-                className={`flex h-[34px] w-[34px] items-center justify-center rounded-control text-lg transition-colors duration-150 ${
+                // 34px is the design's size and too small to sit in a row of
+                // adjacent targets on a phone, where the neighbour is 6px away.
+                className={`flex h-11 w-11 items-center justify-center rounded-control text-lg transition-colors duration-150 sm:h-[34px] sm:w-[34px] ${
                   selected
                     ? "border-[1.5px] border-violet bg-violet/10"
                     : "border border-ink-line bg-surface hover:bg-ink/[.03]"

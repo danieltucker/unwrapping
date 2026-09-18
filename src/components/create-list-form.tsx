@@ -43,8 +43,14 @@ export function CreateListForm({
         </p>
       ) : null}
 
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-xs text-ink-66">All of this is editable later</span>
+      {/* Side by side there is no room left for the button on a phone, and its
+          label breaks across two lines. Every other form in the product submits
+          with a full-width button, so this one does too once the row is too
+          narrow to hold both. */}
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <span className="text-xs text-ink-66 max-sm:text-center">
+          All of this is editable later
+        </span>
         <Button type="submit" disabled={pending}>
           {pending ? "Creating…" : "Add some gifts"}
         </Button>

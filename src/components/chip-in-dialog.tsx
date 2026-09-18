@@ -157,7 +157,7 @@ export function ChipInDialog({
                 <button
                   type="button"
                   onClick={() => dialog.current?.close()}
-                  className="w-full text-center text-sm font-semibold text-ink-72"
+                  className="min-h-11 w-full text-center text-sm font-semibold text-ink-72"
                 >
                   Not now
                 </button>
@@ -250,7 +250,11 @@ export function ChipInDialog({
                   key={value}
                   type="button"
                   onClick={() => setAmount((value / 100).toString())}
-                  className="rounded-pill border border-ink-line-strong bg-surface px-[13px] py-[6px] text-xs font-semibold text-ink-72 transition-colors duration-150 hover:bg-ink/[.03]"
+                  // "The rest" carries whatever is left of the goal, and a
+                  // number has nowhere to break, so on a phone a large one
+                  // would otherwise push the pill out through the side of the
+                  // panel rather than wrap inside it.
+                  className="max-w-full rounded-pill border border-ink-line-strong bg-surface px-[13px] py-[6px] text-xs font-semibold break-words text-ink-72 transition-colors duration-150 hover:bg-ink/[.03]"
                 >
                   {remaining !== null && value === remaining && value > 0
                     ? `The rest: ${formatPrice(value)}`
@@ -278,7 +282,7 @@ export function ChipInDialog({
             <button
               type="button"
               onClick={() => dialog.current?.close()}
-              className="w-full text-center text-sm font-semibold text-ink-72"
+              className="min-h-11 w-full text-center text-sm font-semibold text-ink-72"
             >
               Never mind
             </button>

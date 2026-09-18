@@ -134,7 +134,11 @@ export function GiftCard({
             href={item.href}
             target="_blank"
             rel="noopener noreferrer nofollow"
-            className="mb-3 text-xs font-medium text-violet hover:text-violet-hover"
+            // The line of text is 16px tall, which is a poor thing to ask a
+            // thumb to hit. The padding doubles the tap area and the negative
+            // top margin gives back what it took, so the gap either side of the
+            // link is the same 12px it was.
+            className="-mt-2 mb-1 py-2 text-xs font-medium text-violet hover:text-violet-hover"
           >
             {item.sourceDomain} ↗
           </a>

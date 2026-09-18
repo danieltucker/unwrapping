@@ -38,7 +38,15 @@ function TagIcon() {
 export function SiteHeader() {
   return (
     <header className="flex items-center justify-between gap-4 border-b border-ink-line px-[1.375rem] py-3 sm:px-8">
-      <Link href="/" className="flex items-center gap-2.5">
+      {/* The pills here are already thumb-sized; the plain text links are not,
+          and a 16px-tall tap target is the one people miss. On a phone those
+          carry a 44px touch area, spent against the header's own padding by the
+          negative margin rather than on the row, so nothing looks any different
+          or moves. From `sm` up, where there is a pointer, it goes back. */}
+      <Link
+        href="/"
+        className="flex min-h-11 items-center gap-2.5 -my-2.5 sm:min-h-0 sm:my-0"
+      >
         <BrandMark size={24} />
         <span className="text-sm font-bold tracking-[-0.01em]">{site.name}</span>
       </Link>
@@ -89,7 +97,7 @@ async function Identity() {
         <>
           <Link
             href={routes.signIn}
-            className="px-2 text-xs font-semibold text-ink-76 hover:text-ink"
+            className="inline-flex min-h-11 items-center px-2 text-xs font-semibold text-ink-76 -my-2 hover:text-ink sm:min-h-0 sm:my-0"
           >
             Sign in
           </Link>

@@ -93,6 +93,34 @@
     margin: auto;
     max-height: calc(100dvh - 48px);
     overflow: auto;
+    /* A dialog that has been scrolled to its end must not hand the rest of the
+       gesture to the list behind it, which on a phone reads as the page
+       squirming out from under the panel. */
+    overscroll-behavior: contain;
+  }
+}
+
+/* Safari on iOS zooms the whole page in the moment it focuses a control whose
+   text is under 16px, and it does not zoom back out afterwards: the layout
+   people report as "broken" after tapping a field is the page still sitting at
+   that magnification, now wider than the screen. So every control is 16px on a
+   phone, and the design's 14px returns from `sm` up, where there is no
+   on-screen keyboard to trigger it. `max()` keeps the floor without capping a
+   reader who has turned their browser font up.
+
+   The alternative fix, `maximum-scale=1` on the viewport, works by taking
+   pinch-zoom away from everyone, so it is not one.
+
+   Deliberately outside `@layer base`: Tailwind's utilities are a cascade layer,
+   so a layered rule would lose to the `text-sm` on each field. Unlayered author
+   styles outrank every layer, which is what makes this hold for fields nobody
+   has written yet. Checkboxes and radios are sized in `h-4 w-4` and don't
+   render text, so they are along for the ride. */
+@media (width < 40rem) {
+  input,
+  select,
+  textarea {
+    font-size: max(1rem, 16px);
   }
 }
 

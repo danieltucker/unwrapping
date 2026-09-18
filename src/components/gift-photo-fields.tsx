@@ -152,7 +152,7 @@ export function GiftUploadDialog({
         <button
           type="button"
           onClick={() => dialogRef.current?.close()}
-          className="w-full text-center text-sm font-semibold text-ink-72"
+          className="min-h-11 w-full text-center text-sm font-semibold text-ink-72"
         >
           Never mind
         </button>
