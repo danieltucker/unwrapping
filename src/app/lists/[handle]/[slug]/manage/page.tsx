@@ -1,5 +1,4 @@
 import { asc, eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import Link from "next/link";
 import QRCode from "qrcode";
 
@@ -20,6 +19,7 @@ import {
   toDateInput,
 } from "@/lib/date";
 import { requireOwnedList } from "@/lib/list-access";
+import { displayHost, origin } from "@/lib/origin";
 import * as routes from "@/lib/routes";
 
 export async function generateMetadata({
@@ -56,11 +56,9 @@ export default async function EditorPage({
     getOwnerItemStatus(list),
   ]);
 
-  const host = (await headers()).get("host") ?? "localhost:3000";
-  const protocol = host.startsWith("localhost") ? "http" : "https";
   const short = routes.shortLink(list);
-  const shareUrl = `${protocol}://${host}${short ?? routes.publicList(list, ownerHandle)}`;
-  const canonical = `${host}${routes.publicList(list, ownerHandle)}`;
+  const shareUrl = `${origin}${short ?? routes.publicList(list, ownerHandle)}`;
+  const canonical = `${displayHost}${routes.publicList(list, ownerHandle)}`;
   const qrSvg = await QRCode.toString(shareUrl, {
     type: "svg",
     margin: 0,

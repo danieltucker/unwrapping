@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
 import QRCode from "qrcode";
 
@@ -7,6 +6,7 @@ import { SharePanel } from "@/components/share-panel";
 import { Card } from "@/components/ui";
 import { weeksUntil } from "@/lib/date";
 import { requireOwnedList } from "@/lib/list-access";
+import { displayHost, origin } from "@/lib/origin";
 import * as routes from "@/lib/routes";
 
 export const metadata: Metadata = { title: "Share it" };
@@ -17,13 +17,11 @@ export default async function SharePage({
   const { handle, slug } = await params;
   const { list, ownerHandle } = await requireOwnedList(handle, slug);
 
-  const host = (await headers()).get("host") ?? "localhost:3000";
-  const protocol = host.startsWith("localhost") ? "http" : "https";
 
   // The short link is the one worth pasting; the canonical URL is where it lands.
   const short = routes.shortLink(list);
-  const shareUrl = `${protocol}://${host}${short ?? routes.publicList(list, ownerHandle)}`;
-  const canonical = `${host}${routes.publicList(list, ownerHandle)}`;
+  const shareUrl = `${origin}${short ?? routes.publicList(list, ownerHandle)}`;
+  const canonical = `${displayHost}${routes.publicList(list, ownerHandle)}`;
 
   const qr = await QRCode.toString(shareUrl, {
     type: "svg",

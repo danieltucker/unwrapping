@@ -29,3 +29,10 @@ export const origin = (process.env.SITE_URL ?? `https://${site.domain}`).replace
  */
 export const secureCookies =
   process.env.NODE_ENV === "production" && origin.startsWith("https://");
+
+/**
+ * The origin without its scheme, for the share panel and anywhere else a URL is
+ * shown to be read out or typed rather than clicked: `unwrapp.ing/lists/daniel/
+ * birthday`, not `https://unwrapp.ing/...`.
+ */
+export const displayHost = origin.replace(/^https?:\/\//, "");

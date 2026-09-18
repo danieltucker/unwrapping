@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { lists, users } from "@/db/schema";
 import { viewerOwns } from "@/lib/list-access";
+import { origin } from "@/lib/origin";
 import { publicList } from "@/lib/routes";
 
 /**
@@ -13,7 +14,7 @@ import { publicList } from "@/lib/routes";
  * temporary redirect because the target moves if the owner changes their
  * handle or the list is renamed.
  */
-export async function GET(request: Request, context: RouteContext<"/[code]">) {
+export async function GET(_request: Request, context: RouteContext<"/[code]">) {
   const { code } = await context.params;
 
   const row = await db
@@ -41,7 +42,7 @@ export async function GET(request: Request, context: RouteContext<"/[code]">) {
   }
 
   return Response.redirect(
-    new URL(publicList(row.list, row.handle), request.url),
+    new URL(publicList(row.list, row.handle), origin),
     307,
   );
 }
