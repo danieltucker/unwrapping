@@ -9,6 +9,18 @@ const nextConfig: NextConfig = {
   // uses, so the Docker image needs no npm install. See docs/self-hosting.md.
   output: "standalone",
 
+  experimental: {
+    serverActions: {
+      // Gift photos are uploaded through a Server Action, and the default cap
+      // on an action's request body is 1MB — less than an ordinary phone photo,
+      // so the request died in the framework before any of our code ran and the
+      // owner got a bare 500 page. This sits above `uploads.maxBytes` in
+      // src/config/site.ts (8MB), with room for what multipart adds, so the
+      // file that is too big is the one we refuse ourselves, with a sentence.
+      bodySizeLimit: "9mb",
+    },
+  },
+
   outputFileTracingIncludes: {
     // The migrations are read from disk at runtime (src/db/index.ts), which
     // static analysis cannot see, so they have to be named here or a container

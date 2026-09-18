@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState, type RefObject } from "react";
 
 import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui";
+import { formatBytes, uploads } from "@/config/site";
 import { suggestGiftEmoji } from "@/lib/emoji";
 import { uploadPhoto, type UploadState } from "@/lib/photo-actions";
 
@@ -107,6 +108,12 @@ export function GiftUploadDialog({
     uploadPhoto,
     {},
   );
+  // Measured here, on the file the picker handed us, rather than left to the
+  // server: a photo straight off a phone is routinely over the limit, and
+  // sending eight megabytes in order to be told so is a slow way to find out.
+  const [tooBig, setTooBig] = useState<string | null>(null);
+  // What we already know beats what came back from the last attempt.
+  const problem = tooBig ?? state.error;
 
   // Hand the URL up and close once the photo lands; an error keeps the dialog
   // open so it can be read. Keyed on the URL alone, so a re-render never
@@ -129,24 +136,37 @@ export function GiftUploadDialog({
           {hasPhoto ? "Add another photo" : "Add a photo"}
         </h2>
         <p className="mb-4 text-xs leading-[1.6] text-ink-72">
-          JPEG, PNG, WebP, GIF or AVIF, up to 8MB. Portrait crops look best.
+          JPEG, PNG, WebP, GIF or AVIF, up to {uploads.maxLabel}. Portrait crops
+          look best.
         </p>
 
         <input
           type="file"
           name="photo"
           required
-          accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+          accept={uploads.accept}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            setTooBig(
+              file && file.size > uploads.maxBytes
+                ? `That photo is ${formatBytes(file.size)}, and the limit is ${uploads.maxLabel}. Try a smaller one, or a screenshot of it.`
+                : null,
+            );
+          }}
           className="mb-4 w-full text-xs file:mr-3 file:rounded-pill file:border-0 file:bg-ink/[.06] file:px-4 file:py-2 file:text-xs file:font-semibold"
         />
 
-        {state.error ? (
+        {problem ? (
           <p role="alert" className="mb-4 text-xs font-medium text-rose-dark">
-            {state.error}
+            {problem}
           </p>
         ) : null}
 
-        <Button type="submit" disabled={pending} className="mb-2 w-full">
+        <Button
+          type="submit"
+          disabled={pending || tooBig !== null}
+          className="mb-2 w-full"
+        >
           {pending ? "Uploading…" : "Upload photo"}
         </Button>
         <button

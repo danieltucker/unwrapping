@@ -201,6 +201,9 @@ const DEBUG = process.env.SCRAPE_DEBUG === "1";
  */
 function log(trace: ScrapeTrace) {
   const host = sourceDomain(trace.finalUrl ?? trace.url) ?? "-";
+  // A pasted "link" is whatever someone had on their clipboard, and a log line
+  // is no place to find out it was a novel.
+  const url = (trace.finalUrl ?? trace.url ?? trace.input).slice(0, 300);
   const parts = [
     `[scrape] ${trace.outcome}`,
     `dur=${trace.ms}ms`,
@@ -217,7 +220,7 @@ function log(trace: ScrapeTrace) {
       : null,
     trace.via ? `images=${trace.via.images ?? "none"}/${trace.found.images}` : null,
     trace.savedTo ? `saved=${trace.savedTo}` : null,
-    `url=${trace.finalUrl ?? trace.url ?? trace.input}`,
+    `url=${url}`,
   ].filter(Boolean);
 
   console.log(parts.join(" "));

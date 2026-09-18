@@ -3,6 +3,8 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { formatBytes, uploads } from "@/config/site";
+
 /**
  * Owner-uploaded gift photos.
  *
@@ -12,7 +14,6 @@ import path from "node:path";
  */
 
 const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
-const MAX_BYTES = 8_000_000;
 
 // SVG is deliberately absent: it can carry script, and these are displayed
 // on a page shared with strangers.
@@ -54,8 +55,10 @@ export type UploadResult = { url: string } | { error: string };
 
 export async function saveUpload(file: File): Promise<UploadResult> {
   if (file.size === 0) return { error: "That file was empty." };
-  if (file.size > MAX_BYTES) {
-    return { error: "That image is larger than 8MB. Try a smaller one." };
+  if (file.size > uploads.maxBytes) {
+    return {
+      error: `That image is ${formatBytes(file.size)}. The limit is ${uploads.maxLabel}.`,
+    };
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -65,8 +68,18 @@ export async function saveUpload(file: File): Promise<UploadResult> {
   }
 
   const name = `${crypto.randomUUID()}.${extension}`;
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  await writeFile(path.join(UPLOAD_DIR, name), bytes);
+
+  try {
+    await mkdir(UPLOAD_DIR, { recursive: true });
+    await writeFile(path.join(UPLOAD_DIR, name), bytes);
+  } catch (error) {
+    // A full disk, or a data directory the container cannot write to — the
+    // usual first-run mistake when self-hosting. Answered rather than thrown,
+    // so the owner gets a sentence in the panel and the operator gets the
+    // reason in the log; see docs/self-hosting.md on permissions.
+    console.error(`[upload] could not write ${name}:`, error);
+    return { error: "We couldn't save that photo. Try again in a moment." };
+  }
 
   return { url: `/uploads/${name}` };
 }

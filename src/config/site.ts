@@ -54,6 +54,32 @@ export const occasions = [
   { emoji: "🪔", label: "Diwali", prefill: "Diwali" },
 ] as const;
 
+/**
+ * What an owner may upload as a gift photo.
+ *
+ * Here rather than in `src/lib/uploads.ts` because the browser needs the same
+ * number: a photo straight off a phone is routinely over the limit, and the
+ * only pleasant place to say so is before it is sent. The limit is then
+ * enforced twice more, in saveUpload once the bytes land and by Next's own
+ * Server Action body cap in next.config.ts — which sits deliberately *above*
+ * this, so an oversized file is refused by us, in a sentence, rather than by
+ * the framework, with a 500.
+ *
+ * SVG is deliberately absent: it can carry script, and these are shown on a
+ * page shared with strangers. The sniffing in uploads.ts is what enforces
+ * that; this list only decides what the file picker offers.
+ */
+export const uploads = {
+  maxBytes: 8_000_000,
+  maxLabel: "8MB",
+  accept: "image/jpeg,image/png,image/webp,image/gif,image/avif",
+} as const;
+
+/** "12.4MB", for telling someone how far over the limit they are. */
+export function formatBytes(bytes: number): string {
+  return `${(bytes / 1_000_000).toFixed(1)}MB`;
+}
+
 /** Prices are stored as integer cents to keep arithmetic exact. */
 export function formatPrice(cents: number): string {
   return new Intl.NumberFormat(site.locale, {
