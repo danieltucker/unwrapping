@@ -22,6 +22,17 @@ const globalForDb = globalThis as unknown as {
 };
 
 /**
+ * Whether this process is `next build` rather than a running server.
+ *
+ * A build imports every module that a page reaches, in one worker process per
+ * core, purely to collect its configuration — and this module opens a database
+ * as a side effect of being imported. Nothing in a build ever queries, so the
+ * rule throughout this file is: while building, touch the file as little as
+ * possible. See `migrateIfAsked` and the journal mode in `connect`.
+ */
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+
+/**
  * Applies any pending migration before the first query.
  *
  * On by default in production and off in development, where the explicit
@@ -37,7 +48,7 @@ function migrateIfAsked(sqlite: Database.Database) {
   // `next build` evaluates these modules with NODE_ENV=production while
   // collecting page data. Migrating somebody's live database as a side effect of
   // a build is not what any of this is for.
-  if (process.env.NEXT_PHASE === "phase-production-build") return;
+  if (isBuildPhase) return;
 
   const asked =
     process.env.DB_AUTO_MIGRATE === "1" ||
@@ -58,13 +69,32 @@ function connect() {
   mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
 
   const sqlite = new Database(file);
-  // WAL lets readers continue during a write; needed once several guests
-  // are claiming at once.
-  sqlite.pragma("journal_mode = WAL");
+
+  // Wait rather than throwing SQLITE_BUSY if a write is in flight. Set first so
+  // everything below it is covered; a timeout declared afterwards does nothing
+  // for the statements that already ran.
+  sqlite.pragma("busy_timeout = 5000");
+
+  /*
+   * WAL lets readers continue during a write; needed once several guests are
+   * claiming at once.
+   *
+   * Skipped while building, and that is not an optimisation. The journal mode
+   * belongs to the file rather than to this connection, so switching it takes a
+   * brief exclusive lock — and `next build` imports this module in every
+   * page-data worker at once, one per core. On a machine with enough of them
+   * they contend, and the losers throw SQLITE_BUSY: "Failed to collect
+   * configuration for /_not-found", with `database is locked` underneath it.
+   *
+   * The busy timeout above does not save this; the pragma gives up rather than
+   * waiting. Not asking for it during a build does, and costs nothing, because
+   * a build never reads or writes a row. The server that starts afterwards sets
+   * it for real.
+   */
+  if (!isBuildPhase) sqlite.pragma("journal_mode = WAL");
+
   // SQLite leaves foreign keys off by default; our cascades depend on them.
   sqlite.pragma("foreign_keys = ON");
-  // Wait rather than throwing SQLITE_BUSY if a write is in flight.
-  sqlite.pragma("busy_timeout = 5000");
 
   migrateIfAsked(sqlite);
   return sqlite;
