@@ -158,7 +158,8 @@ docker compose logs -f | grep "\[scrape\]"
 
 ```
 [scrape] ok dur=2306ms host=amazon.com status=200 bytes=2862145 title=site markup price=site markup/4999 images=site markup/1 url=https://www.amazon.com/dp/B0DCN2KVKV
-[scrape] blocked dur=430ms host=bestbuy.com cause=ECONNRESET url=https://www.bestbuy.com/product/...
+[scrape] blocked dur=430ms host=example-shop.com cause=ECONNRESET url=https://www.example-shop.com/p/...
+[scrape] challenged dur=892ms host=rei.com status=200 bytes=2827 title=none price=none/none images=none/0 url=https://www.rei.com/product/...
 ```
 
 The first word is what happened. `ok` means we read the page; `title=`, `price=`
@@ -168,7 +169,8 @@ we failed to look. Anything else is the shop, not the parser:
 
 | Outcome | What it means |
 |---|---|
-| `blocked` | The shop dropped the connection before answering. Bot protection at their edge — it refuses the connection itself, so no header or user agent changes it. Best Buy, Walmart and Target all do this. The gift has to be written in by hand, and the form says so. |
+| `blocked` | The shop dropped the connection before answering. Bot protection at their edge — it refuses the connection itself, so no header or user agent changes it. The gift has to be written in by hand, and the form says so. |
+| `challenged` | It answered `200`, but with an "are you a robot" interstitial instead of the product — Akamai, Cloudflare, PerimeterX, DataDome, or Amazon's own captcha page. Reading it would mean running the challenge's JavaScript and passing its behavioural checks, which no parser change reaches. Reported rather than filled in half-wrong: the interstitial has a title and sometimes an image, and putting either on a card would be worse than leaving it blank. REI and Best Buy are both this. See [referrals-and-product-data.md](referrals-and-product-data.md) for the way round it. |
 | `timeout` | No answer in 8 seconds. Worth one retry; a shop that stalls every time is refusing us politely. |
 | `http-error` | It answered with a status, not a page. `403`/`429` is being turned away, `404` is usually a link that has expired. |
 | `unreachable` | DNS, TLS or the network — check the container has outbound access. |

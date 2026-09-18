@@ -1,7 +1,9 @@
 import { CardPhoto } from "@/components/card-photo";
 import { BoughtButton, ReleaseButton, ReserveDialog } from "@/components/reserve-dialog";
+import { formatPrice } from "@/config/site";
 import type { ClaimRule } from "@/db/schema";
 import type { PublicItem } from "@/lib/claims";
+import { isStillOpen } from "@/lib/funding";
 
 /**
  * An idea on the public list: "knitting", "Xbox games".
@@ -15,9 +17,16 @@ import type { PublicItem } from "@/lib/claims";
  * It is a separate component rather than a branch inside GiftCard because
  * almost nothing survives that difference: no price, no shop, no funding bar,
  * no taken state, and a different question on the button.
+ *
+ * An idea may also carry presents of its own — needles and wool under
+ * "knitting" — and those are the opposite again: ordinary gifts, each with a
+ * price and a shop, each used up by the one person who buys it. They are listed
+ * under the idea rather than in the grid because the idea is the reason they
+ * make sense together; a tyre patch on its own says nothing.
  */
 export function IdeaCard({
   item,
+  suggestions,
   handle,
   listKey,
   claimRule,
@@ -26,6 +35,8 @@ export function IdeaCard({
   surpriseMode,
 }: {
   item: PublicItem;
+  /** Presents the owner hung under this idea. Ordinary gifts, in list order. */
+  suggestions: PublicItem[];
   handle: string;
   listKey: string;
   claimRule: ClaimRule;
@@ -61,8 +72,21 @@ export function IdeaCard({
           {item.reason ?? "Anything along these lines would land well."}
         </p>
 
+        {suggestions.length > 0 ? (
+          <Suggestions
+            suggestions={suggestions}
+            handle={handle}
+            listKey={listKey}
+            claimRule={claimRule}
+            viewerIsOwner={viewerIsOwner}
+            signedIn={signedIn}
+            surpriseMode={surpriseMode}
+          />
+        ) : null}
+
         <Action
           item={item}
+          hasSuggestions={suggestions.length > 0}
           handle={handle}
           listKey={listKey}
           claimRule={claimRule}
@@ -107,7 +131,69 @@ function Pill({ item }: { item: PublicItem }) {
   return <span className={`${base} bg-ink/[.06] text-ink-72`}>Idea</span>;
 }
 
-function Action({
+/**
+ * The presents hanging under an idea.
+ *
+ * Each one is an ordinary gift and is treated like one: it has a price, it
+ * links out to a shop, and the first guest to take it takes it. That is the
+ * whole reason they are worth listing separately from the idea above them —
+ * "needles" is something a guest can actually go and buy, where "knitting" is
+ * only a direction.
+ *
+ * Deliberately a list of rows rather than small cards. They are suggestions
+ * inside something else, and giving them the full card treatment made them
+ * compete with the real grid above for the same attention.
+ */
+function Suggestions({
+  suggestions,
+  handle,
+  listKey,
+  claimRule,
+  viewerIsOwner,
+  signedIn,
+  surpriseMode,
+}: {
+  suggestions: PublicItem[];
+  handle: string;
+  listKey: string;
+  claimRule: ClaimRule;
+  viewerIsOwner: boolean;
+  signedIn: boolean;
+  surpriseMode: boolean;
+}) {
+  const free = suggestions.filter(isStillOpen).length;
+
+  return (
+    <div className="mb-[14px] border-t border-ink-line pt-[13px]">
+      <p className="mb-[9px] text-2xs font-semibold uppercase tracking-[1.3px] text-ink-62">
+        {/* The count is about what is left to buy, so it is only worth saying
+            when some of it has gone. */}
+        {free === suggestions.length
+          ? suggestions.length === 1
+            ? "One that fits"
+            : `${suggestions.length} that fit`
+          : `${free} of ${suggestions.length} still free`}
+      </p>
+
+      <ul className="flex flex-col gap-[7px]">
+        {suggestions.map((suggestion) => (
+          <SuggestionRow
+            key={suggestion.id}
+            item={suggestion}
+            handle={handle}
+            listKey={listKey}
+            claimRule={claimRule}
+            viewerIsOwner={viewerIsOwner}
+            signedIn={signedIn}
+            surpriseMode={surpriseMode}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SuggestionRow({
   item,
   handle,
   listKey,
@@ -117,6 +203,110 @@ function Action({
   surpriseMode,
 }: {
   item: PublicItem;
+  handle: string;
+  listKey: string;
+  claimRule: ClaimRule;
+  viewerIsOwner: boolean;
+  signedIn: boolean;
+  surpriseMode: boolean;
+}) {
+  const open = isStillOpen(item);
+  // Taken by somebody else: still worth showing, because "that one is handled"
+  // is useful to the next guest, but it is no longer an offer.
+  const gone = !open && !item.claimedByViewer;
+
+  return (
+    <li
+      className={`flex items-center gap-[10px] rounded-[9px] border px-[9px] py-2 ${
+        item.claimedByViewer
+          ? "border-pine/25 bg-pine/[.06]"
+          : gone
+            ? "border-ink-line bg-ink/[.03]"
+            : "border-ink-line bg-surface"
+      }`}
+    >
+      <span
+        className={`flex h-[38px] w-[32px] shrink-0 items-center justify-center overflow-hidden rounded-[6px] bg-ink/[.05] ${
+          gone ? "opacity-55" : ""
+        }`}
+      >
+        {item.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.image} alt="" className="h-full w-full object-cover" />
+        ) : item.emoji ? (
+          <span className="text-base leading-none">{item.emoji}</span>
+        ) : null}
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs font-semibold leading-[1.35]">
+          {/* The link is the title itself, the way it is on a gift card. */}
+          {item.href ? (
+            <a
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="underline-offset-2 hover:underline focus-ring"
+            >
+              {item.title}
+            </a>
+          ) : (
+            item.title
+          )}
+        </span>
+        <span className="block text-2xs leading-[1.4] text-ink-62">
+          {item.claimedByViewer
+            ? item.boughtByViewer
+              ? "✓ You got this one"
+              : "You're getting this"
+            : gone
+              ? "Taken care of"
+              : [
+                  item.priceCents === null ? null : formatPrice(item.priceCents),
+                  item.sourceDomain,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "No price listed"}
+        </span>
+      </span>
+
+      {viewerIsOwner || gone ? null : item.claimedByViewer ? (
+        <ReleaseButton
+          itemId={item.id}
+          handle={handle}
+          listKey={listKey}
+          size="sm"
+          className="shrink-0"
+        />
+      ) : (
+        <ReserveDialog
+          item={item}
+          handle={handle}
+          listKey={listKey}
+          needsFirstName={claimRule === "firstName"}
+          emphasis="outline"
+          signedIn={signedIn}
+          surpriseMode={surpriseMode}
+          size="sm"
+        />
+      )}
+    </li>
+  );
+}
+
+function Action({
+  item,
+  hasSuggestions,
+  handle,
+  listKey,
+  claimRule,
+  viewerIsOwner,
+  signedIn,
+  surpriseMode,
+}: {
+  item: PublicItem;
+  /** Changes what this button is *for*, not what it does. */
+  hasSuggestions: boolean;
   handle: string;
   listKey: string;
   claimRule: ClaimRule;
@@ -161,14 +351,25 @@ function Action({
   // Never "filled": the one emphasised button on a screen belongs to a present
   // somebody still has to buy.
   return (
-    <ReserveDialog
-      item={item}
-      handle={handle}
-      listKey={listKey}
-      needsFirstName={claimRule === "firstName"}
-      emphasis="outline"
-      signedIn={signedIn}
-      surpriseMode={surpriseMode}
-    />
+    <>
+      {/* With presents listed above it, this button has stopped being the only
+          thing to do here and become the way past them: none of these, I'll
+          find my own. Saying so is what keeps the rows above from reading as
+          the only choices on offer. */}
+      {hasSuggestions ? (
+        <p className="mb-[9px] text-center text-2xs leading-[1.5] text-ink-62">
+          Or go your own way with it
+        </p>
+      ) : null}
+      <ReserveDialog
+        item={item}
+        handle={handle}
+        listKey={listKey}
+        needsFirstName={claimRule === "firstName"}
+        emphasis="outline"
+        signedIn={signedIn}
+        surpriseMode={surpriseMode}
+      />
+    </>
   );
 }

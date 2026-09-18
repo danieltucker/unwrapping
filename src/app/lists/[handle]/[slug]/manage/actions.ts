@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
@@ -14,21 +14,34 @@ export type ReorderState = { error?: string };
 /**
  * Persists the order the owner dragged the gifts into.
  *
- * The whole list is sent, not a move, so one dropped request can't leave two
- * gifts sharing a position. Ids that don't belong to this list are dropped and
- * a mismatched count is refused outright, because the list changed underneath them.
+ * The whole group is sent, not a move, so one dropped request can't leave two
+ * gifts sharing a position. Ids that don't belong to it are dropped and a
+ * mismatched count is refused outright, because the list changed underneath them.
+ *
+ * "The group" is one run of siblings: the top level of the list, or the
+ * presents inside a single idea. Positions are counted per group, so sorting
+ * them together would have two gifts in different groups fighting over the same
+ * number — and dragging a present out of its idea by accident is not a gesture
+ * anyone means to make.
  */
 export async function reorderGifts(
   handle: string,
   key: string,
   orderedIds: string[],
+  /** The idea whose presents are being sorted, or null for the top level. */
+  parentId: string | null = null,
 ): Promise<ReorderState> {
   const { list, ownerHandle } = await requireOwnedList(handle, key);
 
   const existing = await db
     .select({ id: items.id })
     .from(items)
-    .where(eq(items.listId, list.id))
+    .where(
+      and(
+        eq(items.listId, list.id),
+        parentId === null ? isNull(items.parentId) : eq(items.parentId, parentId),
+      ),
+    )
     .all();
 
   const owned = new Set(existing.map((item) => item.id));

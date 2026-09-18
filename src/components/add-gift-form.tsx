@@ -12,6 +12,7 @@ import {
   GiftEmojiField,
   GiftPhotoField,
   GiftUploadDialog,
+  usePhotoPaste,
 } from "@/components/gift-photo-fields";
 import { GoalField } from "@/components/goal-field";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
@@ -32,6 +33,15 @@ const EMPTY_MANUAL: ScrapeResult = {
 type FormKeys = { handle: string; listKey: string };
 
 /**
+ * The idea this gift is being added to, carried through every step.
+ *
+ * Both fields or neither: the id is what the server writes, the title is what
+ * the panel says out loud, and a panel that claimed to be filling in an idea it
+ * could not name would be worse than one that said nothing.
+ */
+type Parent = { parentId?: string; parentTitle?: string };
+
+/**
  * Adding a gift, in as many goes as it takes.
  *
  * Start over is a remount rather than a state reset: the step you are on is
@@ -42,8 +52,10 @@ type FormKeys = { handle: string; listKey: string };
 export function AddGiftForm({
   handle,
   listKey,
+  parentId,
+  parentTitle,
   onDone,
-}: FormKeys & { onDone: () => void }) {
+}: FormKeys & Parent & { onDone: () => void }) {
   const [attempt, setAttempt] = useState(0);
 
   return (
@@ -51,6 +63,8 @@ export function AddGiftForm({
       key={attempt}
       handle={handle}
       listKey={listKey}
+      parentId={parentId}
+      parentTitle={parentTitle}
       onDone={onDone}
       onStartOver={() => setAttempt((count) => count + 1)}
     />
@@ -60,9 +74,11 @@ export function AddGiftForm({
 function AddGiftFlow({
   handle,
   listKey,
+  parentId,
+  parentTitle,
   onDone,
   onStartOver,
-}: FormKeys & { onDone: () => void; onStartOver: () => void }) {
+}: FormKeys & Parent & { onDone: () => void; onStartOver: () => void }) {
   const [preview, previewAction, fetching] = useActionState<PreviewState, FormData>(
     previewGift,
     {},
@@ -72,12 +88,36 @@ function AddGiftFlow({
 
   const result = manual ?? preview.result;
 
+  /**
+   * A screenshot pasted at the first step.
+   *
+   * There is no gift yet to attach it to, so it becomes one: the panel moves
+   * straight to writing it in by hand, with the photo already on it. Someone
+   * who pastes a picture of a thing they want is telling us what the gift is,
+   * and asking them to pick "write it in myself" first would be asking them to
+   * repeat themselves.
+   *
+   * Off once a result is on screen: ConfirmGift runs this same hook for itself,
+   * and an early return does not stop the hooks above it from running.
+   */
+  const paste = usePhotoPaste({
+    handle,
+    listKey,
+    enabled: !result && !fetching,
+    onUploaded: (url) => {
+      setKind("thing");
+      setManual({ ...EMPTY_MANUAL, images: [url] });
+    },
+  });
+
   if (fetching) return <Fetching />;
   if (result) {
     return (
       <ConfirmGift
         handle={handle}
         listKey={listKey}
+        parentId={parentId}
+        parentTitle={parentTitle}
         result={result}
         kind={manual ? kind : "thing"}
         onDone={onDone}
@@ -89,10 +129,12 @@ function AddGiftFlow({
   return (
     <div className="p-[26px]">
       <h2 className="mb-[6px] font-display text-[1.75rem] leading-[1.1] tracking-[-.7px]">
-        Add a gift
+        {parentTitle ? `Add to ${parentTitle}` : "Add a gift"}
       </h2>
       <p className="mb-5 text-sm leading-[1.65] text-ink-76">
-        Paste a link from any shop and we&rsquo;ll fetch the rest.
+        {parentTitle
+          ? "A specific present that fits the idea. Guests still get the idea itself if they would rather pick their own."
+          : "Paste a link from any shop and we’ll fetch the rest."}
       </p>
 
       <form action={previewAction}>
@@ -116,8 +158,24 @@ function AddGiftFlow({
         ) : null}
         <p className="mb-5 text-xs leading-[1.6] text-ink-66">
           Paste the whole thing if you shared it from an app: we&rsquo;ll find the
-          link in it. Most shops fill in automatically.
+          link in it. Most shops fill in automatically. Copied a picture instead?
+          Paste that and we&rsquo;ll start the gift from it.
         </p>
+        {paste.pending ? (
+          <p
+            className="mb-3 flex items-center gap-[9px] text-xs font-semibold text-ink-76"
+            aria-live="polite"
+          >
+            <span className="h-[13px] w-[13px] animate-spin rounded-pill border-2 border-violet/25 border-t-violet" />
+            Adding that picture…
+          </p>
+        ) : null}
+        {paste.error ? (
+          <p role="alert" className="mb-3 text-xs font-medium text-rose-dark">
+            {paste.error}
+          </p>
+        ) : null}
+
         <Button type="submit" className="w-full">
           Fetch the details
         </Button>
@@ -129,7 +187,10 @@ function AddGiftFlow({
         <span className="h-px flex-1 bg-ink-line" />
       </div>
 
-      {/* Both routes past the scraper are visible from the first second. */}
+      {/* Every route past the scraper is visible from the first second. Inside
+          an idea there is only one of them: cash and a second idea are both
+          things an idea cannot hold, so they are not offered rather than
+          offered and refused. */}
       <div className="flex flex-col gap-2">
         <button
           type="button"
@@ -145,34 +206,38 @@ function AddGiftFlow({
           </span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            setKind("cash");
-            setManual(EMPTY_MANUAL);
-          }}
-          className="w-full rounded-control border border-ink-line bg-surface px-[15px] py-[13px] text-left transition-colors duration-150 hover:bg-ink/[.03]"
-        >
-          <span className="block text-sm font-semibold">Ask for money instead</span>
-          <span className="block text-xs text-ink-72">
-            Toward something big, or just cash. Guests give what they like
-          </span>
-        </button>
+        {parentId ? null : (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setKind("cash");
+                setManual(EMPTY_MANUAL);
+              }}
+              className="w-full rounded-control border border-ink-line bg-surface px-[15px] py-[13px] text-left transition-colors duration-150 hover:bg-ink/[.03]"
+            >
+              <span className="block text-sm font-semibold">Ask for money instead</span>
+              <span className="block text-xs text-ink-72">
+                Toward something big, or just cash. Guests give what they like
+              </span>
+            </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            setKind("idea");
-            setManual(EMPTY_MANUAL);
-          }}
-          className="w-full rounded-control border border-ink-line bg-surface px-[15px] py-[13px] text-left transition-colors duration-150 hover:bg-ink/[.03]"
-        >
-          <span className="block text-sm font-semibold">Suggest an idea</span>
-          <span className="block text-xs text-ink-72">
-            &ldquo;Knitting&rdquo;, &ldquo;Xbox games&rdquo;. A direction to shop
-            in, for guests who&rsquo;d rather choose
-          </span>
-        </button>
+            <button
+              type="button"
+              onClick={() => {
+                setKind("idea");
+                setManual(EMPTY_MANUAL);
+              }}
+              className="w-full rounded-control border border-ink-line bg-surface px-[15px] py-[13px] text-left transition-colors duration-150 hover:bg-ink/[.03]"
+            >
+              <span className="block text-sm font-semibold">Suggest an idea</span>
+              <span className="block text-xs text-ink-72">
+                &ldquo;Knitting&rdquo;, &ldquo;Xbox games&rdquo;. A direction to shop
+                in, for guests who&rsquo;d rather choose
+              </span>
+            </button>
+          </>
+        )}
       </div>
 
       <p className="mt-3 text-xs leading-[1.6] text-ink-62">
@@ -207,16 +272,19 @@ function Fetching() {
 function ConfirmGift({
   handle,
   listKey,
+  parentId,
+  parentTitle,
   result,
   kind,
   onDone,
   onStartOver,
-}: FormKeys & {
-  result: ScrapeResult;
-  kind: ItemKind;
-  onDone: () => void;
-  onStartOver: () => void;
-}) {
+}: FormKeys &
+  Parent & {
+    result: ScrapeResult;
+    kind: ItemKind;
+    onDone: () => void;
+    onStartOver: () => void;
+  }) {
   const [state, action, pending] = useActionState<AddGiftState, FormData>(addGift, {});
   // Photos are held here rather than read straight off the scrape, so one the
   // owner uploads joins the candidates before the gift exists to attach it to.
@@ -228,6 +296,21 @@ function ConfirmGift({
   // A group gift needs a goal, so the field only appears once it's one.
   const [isGroupGift, setIsGroupGift] = useState(false);
   const uploadDialog = useRef<HTMLDialogElement>(null);
+
+  // No itemId: the gift does not exist yet, so a pasted photo is carried on the
+  // form exactly as an uploaded one is, and attached when the gift is created.
+  const paste = usePhotoPaste({
+    handle,
+    listKey,
+    onUploaded: (url) => {
+      // Safe to read `images` directly: usePhotoPaste re-reads this callback on
+      // every render, so it is never the stale one from when paste was armed.
+      setImages([...images, url]);
+      setSelected(images.length);
+      // Covers a paste aimed into the upload panel rather than the form behind it.
+      uploadDialog.current?.close();
+    },
+  });
 
   // Cash has no price, no quantity and no choice about chipping in, and an
   // idea has none of those either, so those controls are not shown rather than
@@ -254,7 +337,15 @@ function ConfirmGift({
         <input type="hidden" name="selectedImageIndex" value={selected} />
         <input type="hidden" name="currency" value={result.currency ?? "USD"} />
         <input type="hidden" name="kind" value={kind} />
+        {parentId ? <input type="hidden" name="parentId" value={parentId} /> : null}
         {cash ? <input type="hidden" name="isGroupGift" value="on" /> : null}
+
+        {parentTitle ? (
+          <p className="mb-3 rounded-control bg-violet-wash px-[13px] py-[10px] text-xs font-semibold text-violet-hover">
+            Going under &ldquo;{parentTitle}&rdquo;, with the idea&rsquo;s other
+            presents.
+          </p>
+        ) : null}
 
         {result.error ? (
           <p className="mb-5 rounded-control border border-amber/30 bg-amber-wash px-[13px] py-[10px] text-xs font-medium text-amber-dark">
@@ -291,6 +382,7 @@ function ConfirmGift({
             onSelect={setSelected}
             emoji={emoji}
             onOpenUpload={() => uploadDialog.current?.showModal()}
+            pasting={paste.pending}
           />
 
           <div className="flex min-w-0 flex-1 flex-col gap-[11px]">
@@ -402,6 +494,12 @@ function ConfirmGift({
           ) : null}
         </div>
 
+        {paste.error ? (
+          <p role="alert" className="mb-4 text-xs font-medium text-rose-dark">
+            {paste.error}
+          </p>
+        ) : null}
+
         {state.error ? (
           <p role="alert" className="mb-4 text-xs font-medium text-rose-dark">
             {state.error}
@@ -410,7 +508,7 @@ function ConfirmGift({
 
         <div className="flex items-center gap-[9px]">
           <Button type="submit" disabled={pending} className="flex-1">
-            {pending ? "Adding…" : "Add to list"}
+            {pending ? "Adding…" : parentTitle ? "Add to the idea" : "Add to list"}
           </Button>
           <button
             type="button"

@@ -27,6 +27,7 @@ export function ReserveDialog({
   emphasis,
   signedIn,
   surpriseMode,
+  size = "md",
 }: {
   item: PublicItem;
   handle: string;
@@ -35,6 +36,13 @@ export function ReserveDialog({
   emphasis: "filled" | "outline";
   signedIn: boolean;
   surpriseMode: boolean;
+  /**
+   * "sm" is for a present listed inside an idea, where the trigger sits at the
+   * end of a row rather than across the foot of a card. Only the trigger
+   * shrinks; the dialog it opens is the same one, because the decision being
+   * made in it is exactly as big either way.
+   */
+  size?: "sm" | "md";
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [state, action, pending] = useActionState<ReserveState, FormData>(
@@ -60,12 +68,22 @@ export function ReserveDialog({
         type="button"
         onClick={() => dialog.current?.showModal()}
         className={
-          emphasis === "filled"
-            ? "w-full rounded-pill bg-violet py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
-            : "w-full rounded-pill border border-violet/45 py-3 text-sm font-semibold text-violet transition-colors duration-150 hover:bg-violet-wash"
+          size === "sm"
+            ? `shrink-0 whitespace-nowrap rounded-pill px-[13px] py-[7px] text-xs font-semibold transition-colors duration-150 ${
+                emphasis === "filled"
+                  ? "bg-violet text-white hover:bg-violet-hover"
+                  : "border border-violet/45 text-violet hover:bg-violet-wash"
+              }`
+            : emphasis === "filled"
+              ? "w-full rounded-pill bg-violet py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
+              : "w-full rounded-pill border border-violet/45 py-3 text-sm font-semibold text-violet transition-colors duration-150 hover:bg-violet-wash"
         }
       >
-        {idea ? "I’ll get something like this" : "I’ll get this one"}
+        {idea
+          ? "I’ll get something like this"
+          : size === "sm"
+            ? "I’ll get it"
+            : "I’ll get this one"}
       </button>
 
       <Modal dialogRef={dialog} labelledBy={`reserve-heading-${item.id}`}>

@@ -5,6 +5,7 @@ import {
   sqliteTable,
   text,
   uniqueIndex,
+  type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 
 const id = () =>
@@ -111,6 +112,11 @@ export const lists = sqliteTable(
  * the one rule to keep in mind wherever claims are counted: see claimItem,
  * which does not cap an idea, and isStillOpen, which never closes one.
  *
+ * An idea can also hold presents of its own — needles and wool under
+ * "knitting" — through items.parentId. Those children are ordinary gifts and
+ * behave like any other; the idea above them stays a direction, and is still
+ * claimable in its own right by someone who would rather choose for themselves.
+ *
  * The enum is enforced in TypeScript only; the column is plain text, so adding
  * a kind needs no migration.
  */
@@ -124,7 +130,25 @@ export const items = sqliteTable(
     listId: text("list_id")
       .notNull()
       .references(() => lists.id, { onDelete: "cascade" }),
+    /**
+     * The idea this gift belongs to, or null when it stands on its own.
+     *
+     * One level only, and only an idea may be a parent: "knitting" holds
+     * needles and wool, but needles hold nothing. That is enforced in the
+     * actions rather than the column, because SQLite cannot express "my parent
+     * has kind = idea" as a constraint; see addGift, which is the only place a
+     * parent is ever set.
+     *
+     * A child is a present like any other — it has a link, a price and a
+     * quantity, and one guest buying it uses it up. Only where it is *shown*
+     * differs: inside its idea rather than in the grid.
+     */
+    parentId: text("parent_id").references((): AnySQLiteColumn => items.id, {
+      onDelete: "cascade",
+    }),
     // Explicit ordering, persisted so drag-to-reorder survives a reload.
+    // Counted among siblings: top-level items share one run of positions and
+    // each idea’s children share their own.
     position: integer("position").notNull().default(0),
     kind: text("kind", { enum: ITEM_KINDS }).notNull().default("thing"),
     title: text("title").notNull(),
@@ -158,7 +182,10 @@ export const items = sqliteTable(
     needsAttention: text("needs_attention"),
     createdAt: createdAt(),
   },
-  (t) => [index("items_list_idx").on(t.listId, t.position)],
+  (t) => [
+    index("items_list_idx").on(t.listId, t.position),
+    index("items_parent_idx").on(t.parentId, t.position),
+  ],
 );
 
 /**

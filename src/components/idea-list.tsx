@@ -17,6 +17,7 @@ import type { PublicItem } from "@/lib/claims";
  */
 export function IdeaList({
   items,
+  suggestions,
   handle,
   listKey,
   claimRule,
@@ -27,6 +28,8 @@ export function IdeaList({
   alone,
 }: {
   items: PublicItem[];
+  /** The presents hung under each idea, keyed by the idea's id. */
+  suggestions: Map<string, PublicItem[]>;
   handle: string;
   listKey: string;
   claimRule: ClaimRule;
@@ -45,14 +48,18 @@ export function IdeaList({
       <p className="mb-[18px] mt-1 max-w-[42rem] text-sm leading-[1.65] text-ink-72">
         Not specific presents, so nothing here gets used up: take one on and it
         stays for everyone else. The count tells you how many people have already
-        gone that way.
+        gone that way. Some list a few actual presents underneath, and those work
+        like any other — once someone takes one, it&rsquo;s taken.
       </p>
 
-      <ul className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-3">
+      {/* items-start, so an idea with a long list of presents under it does not
+          stretch the empty one beside it to the same height. */}
+      <ul className="grid grid-cols-1 items-start gap-[18px] sm:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
           <IdeaCard
             key={item.id}
             item={item}
+            suggestions={suggestions.get(item.id) ?? []}
             handle={handle}
             listKey={listKey}
             claimRule={claimRule}

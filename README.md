@@ -129,4 +129,11 @@ A few things worth knowing before you change them:
   guest identity, no verification. Several bits of UI promise it.
 - **Payments.** `contributions.status` has `pending | captured | refunded` but
   nothing moves money or transitions a row. Group-gift maths and UI are real.
+- **Referrals.** `REFERRAL_TAGS` in `src/lib/outbound.ts` is empty, so
+  `hasReferralTags()` is false and no disclosure line renders. Planned together
+  with retailer product APIs, which are the way round the shops that refuse to be
+  read: [docs/referrals-and-product-data.md](docs/referrals-and-product-data.md).
 - **OAuth sign-in**, the browser extension, and the Occasions/Pricing pages.
+
+Longer-form plans live in [docs/](docs/): retailer data and referrals above,
+and [tags, categories and suggestions](docs/tags-and-suggestions.md).

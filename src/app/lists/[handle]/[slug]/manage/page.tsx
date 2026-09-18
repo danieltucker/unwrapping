@@ -65,14 +65,27 @@ export default async function EditorPage({
     color: { dark: "#17112B", light: "#FFFFFF00" },
   });
 
-  const rows: EditorRow[] = gifts.map((gift) => ({
+  const toRow = (gift: (typeof gifts)[number]): EditorRow => ({
     item: gift,
     raisedCents: funding.find((f) => f.itemId === gift.id)?.raisedCents ?? 0,
     contributorCount: funding.find((f) => f.itemId === gift.id)?.contributorCount ?? 0,
     // Null on a surprise list: the row is not allowed to know.
     claimedCount: status?.get(gift.id)?.claimedCount ?? (status ? 0 : null),
     boughtCount: status?.get(gift.id)?.boughtCount ?? (status ? 0 : null),
-  }));
+    // Filled in below for ideas; nothing else can hold a gift.
+    children: [],
+  });
+
+  // Presents that belong to an idea are drawn inside it, so they are lifted out
+  // of the top level here rather than filtered out in the component. The query
+  // is ordered by position, which is counted per group, so each idea's presents
+  // come out in the owner's order without sorting them again.
+  const rows: EditorRow[] = gifts
+    .filter((gift) => gift.parentId === null)
+    .map((gift) => ({
+      ...toRow(gift),
+      children: gifts.filter((child) => child.parentId === gift.id).map(toRow),
+    }));
 
   const eventLine = [formatEventDate(list.eventDate), relativeEvent(list.eventDate)]
     .filter(Boolean)
@@ -83,7 +96,8 @@ export default async function EditorPage({
     .filter((price): price is number => price !== null);
 
   // Ideas are counted apart from presents here for the same reason they are on
-  // the public list: they are not things anyone is buying.
+  // the public list: they are not things anyone is buying. A present that sits
+  // inside an idea is counted with the presents, because it is one.
   const ideaCount = gifts.filter((gift) => gift.kind === "idea").length;
   const giftCount = gifts.length - ideaCount;
 

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 
 import { reorderGifts } from "@/app/lists/[handle]/[slug]/manage/actions";
+import { AddGiftDialog } from "@/components/add-gift-dialog";
 import { EditGiftDialog } from "@/components/edit-gift-dialog";
 import { FundingBar } from "@/components/funding";
 import { fundingLine } from "@/lib/funding";
@@ -20,6 +21,11 @@ export type EditorRow = {
   /** Null on a surprise list, where the owner may not know. Never 0 by accident. */
   claimedCount: number | null;
   boughtCount: number | null;
+  /**
+   * The presents hung under this idea, in the owner's order. Empty for
+   * everything else: only an idea can hold gifts. See the items table.
+   */
+  children: EditorRow[];
 };
 
 type Filter = "all" | "wanted" | "photo" | "group";
@@ -38,6 +44,11 @@ const FILTER_LABELS: Record<Filter, string> = {
   group: "Group gifts",
 };
 
+/** Every row on the list, at either level. What the filter chips count. */
+function flatten(rows: EditorRow[]): EditorRow[] {
+  return rows.flatMap((row) => [row, ...row.children]);
+}
+
 /**
  * The editor's gift list: filters over what's loaded, and drag-to-reorder that
  * persists an explicit position.
@@ -47,6 +58,11 @@ const FILTER_LABELS: Record<Filter, string> = {
  *
  * Reordering is only offered on the unfiltered list: dragging one row past a
  * hidden one has no meaning the owner could predict.
+ *
+ * A present that belongs to an idea is drawn inside it rather than beside it,
+ * and sorts among its siblings rather than against the whole list — which is
+ * why the ordering lives in RowGroup, one instance per idea plus one for the
+ * top level, rather than here.
  */
 export function GiftRows({
   rows,
@@ -58,69 +74,17 @@ export function GiftRows({
   listKey: string;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
-  const [dragId, setDragId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, startSaving] = useTransition();
 
-  // Held as a string so a fresh server order is trivial to compare against the
-  // one on screen. A drag shows immediately and the server confirms it a moment
-  // later, so the order is adopted only when the server's own answer changes
-  // (an add, a delete, or another tab), never on every render.
-  const serverOrder = rows.map((row) => row.item.id).join(",");
-  const [order, setOrder] = useState(serverOrder);
-  const [lastFromServer, setLastFromServer] = useState(serverOrder);
-
-  if (serverOrder !== lastFromServer) {
-    setLastFromServer(serverOrder);
-    setOrder(serverOrder);
-  }
-
-  const byId = new Map(rows.map((row) => [row.item.id, row]));
-  const ordered = order
-    .split(",")
-    .map((id) => byId.get(id))
-    .filter((row): row is EditorRow => row !== undefined);
-
-  const visible = ordered.filter(MATCHES[filter]);
-  const canReorder = filter === "all" && ordered.length > 1;
-
-  /** Moves a row on screen only; a drag does this for every row it crosses. */
-  function preview(id: string, to: number) {
-    const ids = ordered.map((row) => row.item.id);
-    const from = ids.indexOf(id);
-    if (from === -1 || to < 0 || to >= ids.length || to === from) return;
-
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
-    setOrder(ids.join(","));
-  }
-
-  /** Writes whatever ended up on screen, once the dragging stops. */
-  function persist(ids: string[]) {
-    if (ids.join(",") === lastFromServer) return;
-
-    setError(null);
-    startSaving(async () => {
-      const result = await reorderGifts(handle, listKey, ids);
-      if (result.error) setError(result.error);
-    });
-  }
-
-  function moveBy(id: string, offset: number) {
-    const ids = ordered.map((row) => row.item.id);
-    const from = ids.indexOf(id);
-    const to = from + offset;
-    if (from === -1 || to < 0 || to >= ids.length) return;
-
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
-    setOrder(ids.join(","));
-    persist(ids);
-  }
+  const everything = flatten(rows);
 
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {(Object.keys(MATCHES) as Filter[]).map((key) => {
-          const count = ordered.filter(MATCHES[key]).length;
+          // Counted over the presents inside ideas as well: "needs a photo" is
+          // a list of chores, and one hidden inside an idea is still a chore.
+          const count = everything.filter(MATCHES[key]).length;
           // A filter for something this list doesn't have is just noise.
           if (key !== "all" && count === 0) return null;
 
@@ -141,13 +105,9 @@ export function GiftRows({
           );
         })}
 
-        {ordered.length > 1 ? (
+        {everything.length > 1 ? (
           <span className="ml-auto text-xs font-medium text-ink-62">
-            {saving
-              ? "Saving the order…"
-              : canReorder
-                ? "Drag to reorder"
-                : "Reordering works on the full list"}
+            {filter === "all" ? "Drag to reorder" : "Reordering works on the full list"}
           </span>
         ) : null}
       </div>
@@ -161,32 +121,16 @@ export function GiftRows({
         </p>
       ) : null}
 
-      <ul className="flex flex-col gap-2">
-        {visible.map((row, index) => (
-          <GiftRow
-            key={row.item.id}
-            row={row}
-            handle={handle}
-            listKey={listKey}
-            position={index}
-            total={visible.length}
-            canReorder={canReorder}
-            dragging={dragId === row.item.id}
-            onDragStart={() => setDragId(row.item.id)}
-            onDragEnd={() => {
-              setDragId(null);
-              persist(ordered.map((entry) => entry.item.id));
-            }}
-            // The row being dragged across gives up its place straight away.
-            onDragOver={() => {
-              if (dragId && dragId !== row.item.id) preview(dragId, index);
-            }}
-            onMove={(offset) => moveBy(row.item.id, offset)}
-          />
-        ))}
-      </ul>
+      <RowGroup
+        rows={rows}
+        parentId={null}
+        filter={filter}
+        handle={handle}
+        listKey={listKey}
+        onError={setError}
+      />
 
-      {visible.length === 0 ? (
+      {everything.filter(MATCHES[filter]).length === 0 ? (
         <p className="rounded-[12px] border border-dashed border-ink-line-strong px-6 py-10 text-center text-sm text-ink-72">
           Nothing matches that filter.
         </p>
@@ -195,26 +139,150 @@ export function GiftRows({
   );
 }
 
-function GiftRow({
-  row,
+/**
+ * One run of siblings, sorted among themselves: the top level of the list, or
+ * the presents inside a single idea.
+ *
+ * Each group keeps its own order, because positions are counted per group — see
+ * reorderGifts, which refuses ids from anywhere else. A drag that starts in one
+ * group is confined to it as well: the handlers stop the event travelling, so
+ * dragging a present around inside an idea never reaches the idea's own row and
+ * moves that instead.
+ */
+function RowGroup({
+  rows,
+  parentId,
+  filter,
   handle,
   listKey,
+  onError,
+}: {
+  rows: EditorRow[];
+  parentId: string | null;
+  filter: Filter;
+  handle: string;
+  listKey: string;
+  onError: (message: string | null) => void;
+}) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [, startSaving] = useTransition();
+
+  // Held as a string so a fresh server order is trivial to compare against the
+  // one on screen. A drag shows immediately and the server confirms it a moment
+  // later, so the order is adopted only when the server's own answer changes
+  // (an add, a delete, or another tab), never on every render.
+  const serverOrder = rows.map((row) => row.item.id).join(",");
+  const [order, setOrder] = useState(serverOrder);
+  const [lastFromServer, setLastFromServer] = useState(serverOrder);
+
+  if (serverOrder !== lastFromServer) {
+    setLastFromServer(serverOrder);
+    setOrder(serverOrder);
+  }
+
+  const byId = new Map(rows.map((row) => [row.item.id, row]));
+  const ordered = order
+    .split(",")
+    .map((id) => byId.get(id))
+    .filter((row): row is EditorRow => row !== undefined);
+
+  // An idea stays on screen while one of its presents matches, or the match
+  // would have nowhere to be drawn.
+  const visible = ordered.filter(
+    (row) => MATCHES[filter](row) || row.children.some(MATCHES[filter]),
+  );
+  const canReorder = filter === "all" && ordered.length > 1;
+
+  /** Moves a row on screen only; a drag does this for every row it crosses. */
+  function preview(id: string, to: number) {
+    const ids = ordered.map((row) => row.item.id);
+    const from = ids.indexOf(id);
+    if (from === -1 || to < 0 || to >= ids.length || to === from) return;
+
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    setOrder(ids.join(","));
+  }
+
+  /** Writes whatever ended up on screen, once the dragging stops. */
+  function persist(ids: string[]) {
+    if (ids.join(",") === lastFromServer) return;
+
+    onError(null);
+    startSaving(async () => {
+      const result = await reorderGifts(handle, listKey, ids, parentId);
+      if (result.error) onError(result.error);
+    });
+  }
+
+  function moveBy(id: string, offset: number) {
+    const ids = ordered.map((row) => row.item.id);
+    const from = ids.indexOf(id);
+    const to = from + offset;
+    if (from === -1 || to < 0 || to >= ids.length) return;
+
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    setOrder(ids.join(","));
+    persist(ids);
+  }
+
+  return (
+    <ul className={`flex flex-col ${parentId === null ? "gap-2" : "gap-[7px]"}`}>
+      {visible.map((row, index) => (
+        <GiftRow
+          key={row.item.id}
+          row={row}
+          filter={filter}
+          handle={handle}
+          listKey={listKey}
+          nested={parentId !== null}
+          position={index}
+          total={visible.length}
+          canReorder={canReorder}
+          dragging={dragId === row.item.id}
+          onError={onError}
+          onDragStart={() => setDragId(row.item.id)}
+          onDragEnd={() => {
+            setDragId(null);
+            persist(ordered.map((entry) => entry.item.id));
+          }}
+          // The row being dragged across gives up its place straight away.
+          onDragOver={() => {
+            if (dragId && dragId !== row.item.id) preview(dragId, index);
+          }}
+          onMove={(offset) => moveBy(row.item.id, offset)}
+        />
+      ))}
+    </ul>
+  );
+}
+
+function GiftRow({
+  row,
+  filter,
+  handle,
+  listKey,
+  nested,
   position,
   total,
   canReorder,
   dragging,
+  onError,
   onDragStart,
   onDragEnd,
   onDragOver,
   onMove,
 }: {
   row: EditorRow;
+  filter: Filter;
   handle: string;
   listKey: string;
+  /** A present inside an idea: quieter, and never an idea itself. */
+  nested: boolean;
   position: number;
   total: number;
   canReorder: boolean;
   dragging: boolean;
+  onError: (message: string | null) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   onDragOver: () => void;
@@ -222,127 +290,194 @@ function GiftRow({
 }) {
   const needsPhoto = row.item.needsAttention === "no-photo";
   const photo = row.item.images[row.item.selectedImageIndex] ?? row.item.images[0];
+  const isIdea = row.item.kind === "idea";
 
   return (
     <li
       draggable={canReorder}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      onDragStart={(event) => {
+        // A present inside an idea is its own drag. Without this the idea's row
+        // would pick the same gesture up and start moving as well.
+        event.stopPropagation();
+        onDragStart();
+      }}
+      onDragEnd={(event) => {
+        event.stopPropagation();
+        onDragEnd();
+      }}
       onDragOver={(event) => {
         if (!canReorder) return;
         event.preventDefault();
+        event.stopPropagation();
         onDragOver();
       }}
       onDrop={(event) => event.preventDefault()}
-      className={`flex items-center gap-[15px] rounded-[12px] border px-[15px] py-3 transition-shadow duration-150 ${
-        needsPhoto ? "border-amber/30 bg-amber-wash" : "border-ink-line bg-surface"
+      className={`rounded-[12px] border transition-shadow duration-150 ${
+        needsPhoto
+          ? "border-amber/30 bg-amber-wash"
+          : nested
+            ? "border-ink-line bg-paper"
+            : "border-ink-line bg-surface"
       } ${dragging ? "opacity-70 shadow-card" : ""}`}
     >
-      {canReorder ? (
-        <button
-          type="button"
-          aria-label={`Reorder ${row.item.title}. Position ${position + 1} of ${total}. Use the arrow keys to move it.`}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowUp") {
-              event.preventDefault();
-              onMove(-1);
-            }
-            if (event.key === "ArrowDown") {
-              event.preventDefault();
-              onMove(1);
-            }
-          }}
-          className="-ml-1 cursor-grab px-1 text-base leading-none text-ink/28 focus-ring hover:text-ink-62"
+      <div
+        className={`flex items-center gap-[15px] px-[15px] ${nested ? "py-[9px]" : "py-3"}`}
+      >
+        {canReorder ? (
+          <button
+            type="button"
+            aria-label={`Reorder ${row.item.title}. Position ${position + 1} of ${total}. Use the arrow keys to move it.`}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowUp") {
+                event.preventDefault();
+                onMove(-1);
+              }
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                onMove(1);
+              }
+            }}
+            className="-ml-1 cursor-grab px-1 text-base leading-none text-ink/28 focus-ring hover:text-ink-62"
+          >
+            ⠿
+          </button>
+        ) : null}
+
+        <div
+          className={`shrink-0 overflow-hidden rounded-[7px] bg-ink/[.05] ${
+            nested ? "h-[42px] w-9" : "h-[52px] w-11"
+          }`}
         >
-          ⠿
-        </button>
-      ) : null}
-
-      <div className="h-[52px] w-11 shrink-0 overflow-hidden rounded-[7px] bg-ink/[.05]">
-        {photo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt="" className="h-full w-full object-cover" />
-        ) : row.item.emoji ? (
-          <span className="flex h-full items-center justify-center text-xl leading-none">
-            {row.item.emoji}
-          </span>
-        ) : (
-          <span className="flex h-full items-center justify-center text-center text-2xs leading-tight text-ink-62">
-            No
-            <br />
-            photo
-          </span>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="mb-[3px] flex flex-wrap items-center gap-2">
-          <span className="text-sm font-semibold">{row.item.title}</span>
-          {row.item.kind === "idea" ? <Badge tone="neutral">Idea</Badge> : null}
-          {row.item.isMostWanted ? <Badge tone="violet">Most wanted</Badge> : null}
-          {row.item.isGroupGift ? (
-            <Badge tone="rose">
-              {row.contributorCount > 0
-                ? `Group gift · ${row.contributorCount} in`
-                : "Group gift"}
-            </Badge>
-          ) : null}
-          {row.item.quantity > 1 ? <Badge tone="neutral">Qty {row.item.quantity}</Badge> : null}
-          <ClaimBadge row={row} />
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo} alt="" className="h-full w-full object-cover" />
+          ) : row.item.emoji ? (
+            <span
+              className={`flex h-full items-center justify-center leading-none ${
+                nested ? "text-base" : "text-xl"
+              }`}
+            >
+              {row.item.emoji}
+            </span>
+          ) : (
+            <span className="flex h-full items-center justify-center text-center text-2xs leading-tight text-ink-62">
+              No
+              <br />
+              photo
+            </span>
+          )}
         </div>
 
-        {row.item.isGroupGift && !needsPhoto ? (
-          <div className="max-w-[280px]">
-            <FundingBar
-              raisedCents={row.raisedCents}
-              goalCents={row.item.goalCents}
-              className="mb-[5px]"
-            />
-            <p className="text-xs text-ink-72">
-              {fundingLine(row.raisedCents, row.item.goalCents)}
-            </p>
+        <div className="min-w-0 flex-1">
+          <div className="mb-[3px] flex flex-wrap items-center gap-2">
+            <span className={`font-semibold ${nested ? "text-xs" : "text-sm"}`}>
+              {row.item.title}
+            </span>
+            {isIdea ? <Badge tone="neutral">Idea</Badge> : null}
+            {row.item.isMostWanted ? <Badge tone="violet">Most wanted</Badge> : null}
+            {row.item.isGroupGift ? (
+              <Badge tone="rose">
+                {row.contributorCount > 0
+                  ? `Group gift · ${row.contributorCount} in`
+                  : "Group gift"}
+              </Badge>
+            ) : null}
+            {row.item.quantity > 1 ? (
+              <Badge tone="neutral">Qty {row.item.quantity}</Badge>
+            ) : null}
+            <ClaimBadge row={row} />
           </div>
-        ) : (
-          <p
-            className={`text-xs ${needsPhoto ? "font-medium text-amber-dark" : "text-ink-72"}`}
-          >
-            {needsPhoto
-              ? "No photo found. Items with a photo get claimed far more often"
-              : row.item.kind === "idea"
-                ? // No link, no price and no quantity to report, so the line
-                  // says the one thing an owner might want: how many guests
-                  // have gone this way. Null on a surprise list.
-                  row.claimedCount === null
+
+          {row.item.isGroupGift && !needsPhoto ? (
+            <div className="max-w-[280px]">
+              <FundingBar
+                raisedCents={row.raisedCents}
+                goalCents={row.item.goalCents}
+                className="mb-[5px]"
+              />
+              <p className="text-xs text-ink-72">
+                {fundingLine(row.raisedCents, row.item.goalCents)}
+              </p>
+            </div>
+          ) : (
+            <p
+              className={`text-xs ${needsPhoto ? "font-medium text-amber-dark" : "text-ink-72"}`}
+            >
+              {needsPhoto
+                ? "No photo found. Items with a photo get claimed far more often"
+                : isIdea
+                  ? // No link, no price and no quantity to report, so the line
+                    // says the one thing an owner might want: how many guests
+                    // have gone this way. Null on a surprise list.
+                    row.claimedCount === null
                     ? "A direction to shop in, not one present"
                     : `${row.claimedCount} ${row.claimedCount === 1 ? "person is" : "people are"} going this way`
-                : [
-                    row.item.sourceDomain ?? "Added by hand · no link",
-                    `qty ${row.item.quantity}`,
-                  ].join(" · ")}
-          </p>
-        )}
+                  : [
+                      row.item.sourceDomain ?? "Added by hand · no link",
+                      `qty ${row.item.quantity}`,
+                    ].join(" · ")}
+            </p>
+          )}
+        </div>
+
+        <span className={`font-semibold ${nested ? "text-sm" : "text-base"}`}>
+          {isIdea
+            ? ""
+            : row.item.priceCents === null
+              ? "-"
+              : formatPrice(row.item.priceCents)}
+        </span>
+
+        <EditGiftDialog
+          item={row.item}
+          childCount={row.children.length}
+          handle={handle}
+          listKey={listKey}
+          className={
+            needsPhoto
+              ? "rounded-pill bg-ink px-4 pt-[7px] pb-[5px] text-xs font-semibold text-paper transition-colors duration-150 hover:bg-ink/90"
+              : "rounded-control border border-ink-line px-3 pt-[6px] pb-1 text-xs font-semibold text-ink-72 transition-colors duration-150 hover:bg-ink/[.03]"
+          }
+        >
+          {needsPhoto ? "Fix it" : "Edit"}
+        </EditGiftDialog>
       </div>
 
-      <span className="text-base font-semibold">
-        {row.item.kind === "idea"
-          ? ""
-          : row.item.priceCents === null
-            ? "-"
-            : formatPrice(row.item.priceCents)}
-      </span>
+      {/* An idea's own presents, inside its box rather than beside it. The
+          containment is the point: it is what says these belong to the idea
+          above them rather than to the list. */}
+      {isIdea ? (
+        <div className="border-t border-ink-line px-[15px] py-[11px]">
+          <p className="mb-[9px] text-2xs font-semibold uppercase tracking-[1.3px] text-ink-62">
+            {row.children.length === 0
+              ? "Nothing specific under it yet"
+              : `${row.children.length} ${row.children.length === 1 ? "gift" : "gifts"} under this idea`}
+          </p>
 
-      <EditGiftDialog
-        item={row.item}
-        handle={handle}
-        listKey={listKey}
-        className={
-          needsPhoto
-            ? "rounded-pill bg-ink px-4 pt-[7px] pb-[5px] text-xs font-semibold text-paper transition-colors duration-150 hover:bg-ink/90"
-            : "rounded-control border border-ink-line px-3 pt-[6px] pb-1 text-xs font-semibold text-ink-72 transition-colors duration-150 hover:bg-ink/[.03]"
-        }
-      >
-        {needsPhoto ? "Fix it" : "Edit"}
-      </EditGiftDialog>
+          {row.children.length > 0 ? (
+            <div className="mb-[9px]">
+              <RowGroup
+                rows={row.children}
+                parentId={row.item.id}
+                filter={filter}
+                handle={handle}
+                listKey={listKey}
+                onError={onError}
+              />
+            </div>
+          ) : null}
+
+          <AddGiftDialog
+            handle={handle}
+            listKey={listKey}
+            parentId={row.item.id}
+            parentTitle={row.item.title}
+            className="w-full rounded-control border border-dashed border-ink-line-strong px-[13px] py-[9px] text-xs font-semibold text-ink-72 transition-colors duration-150 hover:bg-ink/[.03]"
+          >
+            + Add a gift to &ldquo;{row.item.title}&rdquo;
+          </AddGiftDialog>
+        </div>
+      ) : null}
     </li>
   );
 }

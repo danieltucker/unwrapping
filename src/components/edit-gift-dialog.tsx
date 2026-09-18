@@ -15,12 +15,18 @@ import type { Item } from "@/db/schema";
  */
 export function EditGiftDialog({
   item,
+  childCount,
   handle,
   listKey,
   className,
   children,
 }: {
   item: Item;
+  /**
+   * How many presents this idea holds. Deleting it takes them with it, and
+   * that is the one thing about this panel worth warning someone about.
+   */
+  childCount: number;
   handle: string;
   listKey: string;
   /** Styles the trigger: the row's own Edit control, or its amber Fix it. */
@@ -54,7 +60,7 @@ export function EditGiftDialog({
             id={`edit-gift-${item.id}`}
             className="font-display text-[1.6875rem] leading-[1.1] tracking-[-.7px]"
           >
-            Edit this gift
+            {item.kind === "idea" ? "Edit this idea" : "Edit this gift"}
           </h2>
         </header>
 
@@ -62,6 +68,7 @@ export function EditGiftDialog({
           <EditGiftForm
             key={instance}
             item={item}
+            childCount={childCount}
             handle={handle}
             listKey={listKey}
             onDone={() => dialog.current?.close()}

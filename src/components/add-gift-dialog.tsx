@@ -14,17 +14,29 @@ import { Button } from "@/components/ui";
  * page of their own for each one hid it, and made "start over" and "done" both
  * mean navigation.
  *
- * The trigger is whatever the caller passes, because this opens from two places
- * that look nothing alike: the button in the header, and the empty list itself.
+ * The trigger is whatever the caller passes, because this opens from three
+ * places that look nothing alike: the button in the header, the empty list
+ * itself, and the dashed strip inside each idea.
+ *
+ * That third one passes a parentId, which is what turns this from "add a gift"
+ * into "add a gift to knitting": the panel drops the choices that make no sense
+ * inside an idea, and the gift is written as a child of it. See addGift, which
+ * is where that parent is checked rather than trusted.
  */
 export function AddGiftDialog({
   handle,
   listKey,
+  parentId,
+  parentTitle,
   className,
   children,
 }: {
   handle: string;
   listKey: string;
+  /** Set when adding to an idea rather than to the list itself. */
+  parentId?: string;
+  /** The idea's title, so the panel can say what it is filling in. */
+  parentTitle?: string;
   /** Styles the trigger itself. Without one it is the product's own button. */
   className?: string;
   children: ReactNode;
@@ -55,7 +67,10 @@ export function AddGiftDialog({
 
       {/* The panel's own heading only exists on the first step, so the name
           comes from the dialog itself and holds across all three. */}
-      <Modal dialogRef={dialog} label="Add a gift">
+      <Modal
+        dialogRef={dialog}
+        label={parentTitle ? `Add a gift to ${parentTitle}` : "Add a gift"}
+      >
         {/* Rendered up front, unlike the edit panel: there is only ever one of
             these, and the paste box being there already is what makes opening
             it feel instant. */}
@@ -63,6 +78,8 @@ export function AddGiftDialog({
           key={instance}
           handle={handle}
           listKey={listKey}
+          parentId={parentId}
+          parentTitle={parentTitle}
           onDone={() => dialog.current?.close()}
         />
       </Modal>

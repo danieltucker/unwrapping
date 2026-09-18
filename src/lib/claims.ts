@@ -25,6 +25,12 @@ export type PublicItem = {
    * presents. See the items table.
    */
   kind: ItemKind;
+  /**
+   * The idea this present sits under, or null when it stands on its own.
+   * Decides only where it is drawn: a child is claimed and counted exactly
+   * like any other present. See the items table.
+   */
+  parentId: string | null;
   title: string;
   href: string | null;
   sourceDomain: string | null;
@@ -167,6 +173,7 @@ export async function getPublicList(
     return {
       id: item.id,
       kind: item.kind,
+      parentId: item.parentId,
       title: item.title,
       href: outboundHref(item.url),
       sourceDomain: item.sourceDomain,

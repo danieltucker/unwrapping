@@ -32,8 +32,18 @@ export default async function PublicListPage({
   const { list, items, stats, viewerIsOwner, ownerHandle } = view;
   // The two halves of the page. Ideas keep the owner's ordering among
   // themselves, which is what splitting a single sorted array preserves.
-  const gifts = items.filter((item) => item.kind !== "idea");
+  //
+  // A present that belongs to an idea is left out of the grid: it is drawn
+  // inside that idea instead, where the reason for it is already on screen. It
+  // stays a present everywhere else — the "still free" count above includes it,
+  // because somebody does still have to buy it.
   const ideas = items.filter((item) => item.kind === "idea");
+  const gifts = items.filter(
+    (item) => item.kind !== "idea" && item.parentId === null,
+  );
+  const suggestions = new Map(
+    ideas.map((idea) => [idea.id, items.filter((item) => item.parentId === idea.id)]),
+  );
   // Guests get offered an account after reserving; people who have one don't.
   const signedIn = (await getCurrentUser()) !== null;
   // Every promise on this page comes from one place, and matches this list.
@@ -145,6 +155,7 @@ export default async function PublicListPage({
 
               <IdeaList
                 items={ideas}
+                suggestions={suggestions}
                 handle={handle}
                 listKey={slug}
                 claimRule={list.claimRule}

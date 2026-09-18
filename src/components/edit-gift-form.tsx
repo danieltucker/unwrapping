@@ -12,6 +12,7 @@ import {
   GiftEmojiField,
   GiftPhotoField,
   GiftUploadDialog,
+  usePhotoPaste,
 } from "@/components/gift-photo-fields";
 import { GoalField } from "@/components/goal-field";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
@@ -23,10 +24,11 @@ type ListKeys = { handle: string; listKey: string };
 
 export function EditGiftForm({
   item,
+  childCount,
   handle,
   listKey,
   onDone,
-}: { item: Item; onDone: () => void } & ListKeys) {
+}: { item: Item; childCount: number; onDone: () => void } & ListKeys) {
   const [state, action, pending] = useActionState<EditItemState, FormData>(
     updateItem,
     {},
@@ -37,6 +39,17 @@ export function EditGiftForm({
   // A group gift needs a goal, so the field only appears once it's one.
   const [isGroupGift, setIsGroupGift] = useState(item.isGroupGift);
   const uploadDialog = useRef<HTMLDialogElement>(null);
+
+  // The gift already exists, so a pasted photo is attached to it server-side
+  // and arrives back through props on revalidation; there is nothing to carry
+  // here. Closing the dialog covers the case where the paste was aimed into
+  // the upload panel rather than at the form behind it.
+  const paste = usePhotoPaste({
+    handle,
+    listKey,
+    itemId: item.id,
+    onUploaded: () => uploadDialog.current?.close(),
+  });
 
   // Kind is fixed once the gift exists, so this only decides what is shown.
   const cash = item.kind === "cash";
@@ -72,6 +85,7 @@ export function EditGiftForm({
             onSelect={setSelected}
             emoji={emoji}
             onOpenUpload={() => uploadDialog.current?.showModal()}
+            pasting={paste.pending}
           />
 
           <div className="flex min-w-0 flex-1 flex-col gap-[11px]">
@@ -179,6 +193,12 @@ export function EditGiftForm({
           ) : null}
         </div>
 
+        {paste.error ? (
+          <p role="alert" className="mb-4 text-xs font-medium text-rose-dark">
+            {paste.error}
+          </p>
+        ) : null}
+
         {state.error ? (
           <p role="alert" className="mb-4 text-xs font-medium text-rose-dark">
             {state.error}
@@ -205,7 +225,13 @@ export function EditGiftForm({
       {/* Repair and destruction both live down here, out of the way. */}
       <div className="mt-6 flex flex-wrap items-start justify-between gap-4 border-t border-ink-line pt-5">
         <RefetchLink item={item} handle={handle} listKey={listKey} />
-        <DeleteItem item={item} handle={handle} listKey={listKey} onDone={onDone} />
+        <DeleteItem
+          item={item}
+          childCount={childCount}
+          handle={handle}
+          listKey={listKey}
+          onDone={onDone}
+        />
       </div>
     </div>
   );
@@ -246,10 +272,11 @@ function RefetchLink({ item, handle, listKey }: { item: Item } & ListKeys) {
 
 function DeleteItem({
   item,
+  childCount,
   handle,
   listKey,
   onDone,
-}: { item: Item; onDone: () => void } & ListKeys) {
+}: { item: Item; childCount: number; onDone: () => void } & ListKeys) {
   const [state, action, pending] = useActionState<EditItemState, FormData>(
     deleteItem,
     {},
@@ -271,15 +298,26 @@ function DeleteItem({
           <input type="hidden" name="handle" value={handle} />
           <input type="hidden" name="key" value={listKey} />
           <input type="hidden" name="itemId" value={item.id} />
+          {/* Deleting an idea takes its presents with it — the database
+              cascades, so there is no half-deleted state to recover from. It
+              is the one thing here somebody could not have guessed. */}
           <p className="text-xs leading-[1.6] text-ink-76">
-            Delete this gift? Anyone who reserved it loses that reservation.
+            {childCount > 0
+              ? `Delete this idea and the ${childCount} ${
+                  childCount === 1 ? "gift" : "gifts"
+                } under it? Anyone who reserved one of them loses that reservation.`
+              : "Delete this gift? Anyone who reserved it loses that reservation."}
           </p>
           <button
             type="submit"
             disabled={pending}
             className="rounded-pill bg-rose px-[15px] py-2 text-xs font-semibold text-white disabled:opacity-60"
           >
-            {pending ? "Deleting…" : "Yes, delete it"}
+            {pending
+            ? "Deleting…"
+            : childCount > 0
+              ? "Yes, delete them"
+              : "Yes, delete it"}
           </button>
           <button
             type="button"
@@ -295,7 +333,7 @@ function DeleteItem({
           onClick={() => setConfirming(true)}
           className="text-xs font-medium text-rose-dark underline-offset-2 hover:underline"
         >
-          Delete this gift
+          {item.kind === "idea" ? "Delete this idea" : "Delete this gift"}
         </button>
       )}
       {state.error ? (

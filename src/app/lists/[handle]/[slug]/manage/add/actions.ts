@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
@@ -48,9 +48,36 @@ export async function addGift(
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "A gift needs a title." };
 
+  /**
+   * The idea this present is being added to, if any.
+   *
+   * Checked here rather than trusted, because a parent id is just a string in
+   * a form post: it has to belong to this list, and it has to be an idea. The
+   * "no grandparent" rule is what keeps the nesting one level deep, which is
+   * the depth the public card and the editor are both drawn for.
+   */
+  const postedParent = String(formData.get("parentId") ?? "").trim();
+  let parentId: string | null = null;
+  if (postedParent) {
+    const parent = await db
+      .select()
+      .from(items)
+      .where(and(eq(items.id, postedParent), eq(items.listId, list.id)))
+      .get();
+
+    if (!parent) return { error: "That idea is no longer on the list." };
+    if (parent.kind !== "idea" || parent.parentId !== null) {
+      return { error: "Only an idea can hold gifts of its own." };
+    }
+    parentId = parent.id;
+  }
+
   // Only "cash" and "idea" change the shape of the row; anything else posted
   // in is a gift like any other.
-  const posted = formData.get("kind");
+  //
+  // Inside an idea there is nothing else to be: an idea within an idea is the
+  // nesting we do not do, and cash has no place under a shopping direction.
+  const posted = parentId ? "thing" : formData.get("kind");
   const kind: ItemKind =
     posted === "cash" ? "cash" : posted === "idea" ? "idea" : "thing";
 
@@ -97,10 +124,17 @@ export async function addGift(
   );
 
   // Keep an explicit ordering so drag-to-reorder has something to persist.
+  // Counted among siblings: a present added to an idea goes after that idea's
+  // other presents, not after everything on the list.
   const last = await db
     .select({ max: sql<number | null>`max(${items.position})` })
     .from(items)
-    .where(eq(items.listId, list.id))
+    .where(
+      and(
+        eq(items.listId, list.id),
+        parentId === null ? isNull(items.parentId) : eq(items.parentId, parentId),
+      ),
+    )
     .get();
 
   // Stands in for a photo wherever there is none.
@@ -118,6 +152,7 @@ export async function addGift(
 
   await db.insert(items).values({
     listId: list.id,
+    parentId,
     position: (last?.max ?? -1) + 1,
     kind,
     title,
