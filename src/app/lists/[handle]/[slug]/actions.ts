@@ -30,6 +30,14 @@ const MESSAGES = {
   "already-yours": "You've already reserved this one.",
 } as const;
 
+/** The same three answers, for something that was never exclusive to begin with. */
+const IDEA_MESSAGES = {
+  // An idea has no capacity, so claimItem cannot report it gone.
+  gone: MESSAGES.gone,
+  missing: "That idea is no longer on the list.",
+  "already-yours": "You're already down for this one.",
+} as const;
+
 export async function reserveGift(
   _previous: ReserveState,
   formData: FormData,
@@ -65,7 +73,9 @@ export async function reserveGift(
   const guestToken = await ensureGuestToken();
   const outcome = await claimItem(itemId, guestToken, firstName);
 
-  if (outcome !== "claimed") return { error: MESSAGES[outcome] };
+  if (outcome !== "claimed") {
+    return { error: (item.kind === "idea" ? IDEA_MESSAGES : MESSAGES)[outcome] };
+  }
 
   revalidatePath(publicList(resolved.list, resolved.ownerHandle));
   return { ok: true };

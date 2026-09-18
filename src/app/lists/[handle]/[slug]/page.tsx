@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { GiftGrid } from "@/components/gift-grid";
+import { IdeaList } from "@/components/idea-list";
 import { EyeOffIcon } from "@/components/ui";
 import { formatPrice, site } from "@/config/site";
 import { getPublicList } from "@/lib/claims";
@@ -29,6 +30,10 @@ export default async function PublicListPage({
   if (!view) notFound();
 
   const { list, items, stats, viewerIsOwner, ownerHandle } = view;
+  // The two halves of the page. Ideas keep the owner's ordering among
+  // themselves, which is what splitting a single sorted array preserves.
+  const gifts = items.filter((item) => item.kind !== "idea");
+  const ideas = items.filter((item) => item.kind === "idea");
   // Guests get offered an account after reserving; people who have one don't.
   const signedIn = (await getCurrentUser()) !== null;
   // Every promise on this page comes from one place, and matches this list.
@@ -78,7 +83,17 @@ export default async function PublicListPage({
           ) : null}
 
           <dl className="flex flex-col gap-px overflow-hidden rounded-[12px]">
-            <Stat label="Still free" value={`${stats.free} of ${stats.total}`} />
+            {/* Presents only. Without this row a guest counting the cards on
+                the page would make the fraction above look wrong. */}
+            {stats.total > 0 ? (
+              <Stat label="Still free" value={`${stats.free} of ${stats.total}`} />
+            ) : null}
+            {stats.ideas > 0 ? (
+              <Stat
+                label="Ideas as well"
+                value={`${stats.ideas}, never taken`}
+              />
+            ) : null}
             <Stat
               label="Price range"
               value={
@@ -112,15 +127,33 @@ export default async function PublicListPage({
               Nothing has been added to this list yet.
             </p>
           ) : (
-            <GiftGrid
-              items={items}
-              handle={handle}
-              listKey={slug}
-              claimRule={list.claimRule}
-              viewerIsOwner={viewerIsOwner}
-              signedIn={signedIn}
-              surpriseMode={list.surpriseMode}
-            />
+            <>
+              {/* The presents keep the filters and the sort; an idea has no
+                  price to sort by and can never be taken, so it would sit out
+                  every one of them. */}
+              {gifts.length > 0 ? (
+                <GiftGrid
+                  items={gifts}
+                  handle={handle}
+                  listKey={slug}
+                  claimRule={list.claimRule}
+                  viewerIsOwner={viewerIsOwner}
+                  signedIn={signedIn}
+                  surpriseMode={list.surpriseMode}
+                />
+              ) : null}
+
+              <IdeaList
+                items={ideas}
+                handle={handle}
+                listKey={slug}
+                claimRule={list.claimRule}
+                viewerIsOwner={viewerIsOwner}
+                signedIn={signedIn}
+                surpriseMode={list.surpriseMode}
+                alone={gifts.length === 0}
+              />
+            </>
           )}
         </main>
       </div>

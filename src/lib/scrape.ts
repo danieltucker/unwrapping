@@ -63,7 +63,10 @@ export async function scrapeProduct(rawUrl: string): Promise<ScrapeResult> {
   const url = normalizeUrl(rawUrl);
 
   const empty: ScrapeResult = {
-    url: url ? canonicalizeUrl(url) : rawUrl,
+    // Keeping the link means keeping a *link*. When nothing in the paste was
+    // one, there is nothing to carry forward, and storing the prose would put
+    // a sentence in the url column and "Added by hand" domains on the card.
+    url: url ? canonicalizeUrl(url) : "",
     sourceDomain: sourceDomain(url),
     title: null,
     priceCents: null,
@@ -72,7 +75,12 @@ export async function scrapeProduct(rawUrl: string): Promise<ScrapeResult> {
     error: null,
   };
 
-  if (!url) return { ...empty, error: "That doesn't look like a web address." };
+  if (!url) {
+    return {
+      ...empty,
+      error: "We couldn't find a link in that.",
+    };
+  }
 
   let html: string;
   let finalUrl = url;

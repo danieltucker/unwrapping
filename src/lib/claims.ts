@@ -19,7 +19,11 @@ import { outboundHref } from "@/lib/outbound";
 
 export type PublicItem = {
   id: string;
-  /** "cash" changes the words, never the arithmetic; see the items table. */
+  /**
+   * "cash" changes the words, never the arithmetic. "idea" changes both: it is
+   * never used up, so it is claimed without a cap and counted apart from the
+   * presents. See the items table.
+   */
   kind: ItemKind;
   title: string;
   href: string | null;
@@ -64,7 +68,14 @@ export type PublicListView = {
   ownerHandle: string | null;
   /** True when the owner is looking at their own public list. */
   viewerIsOwner: boolean;
-  stats: { total: number; free: number; minCents: number | null; maxCents: number | null };
+  /** Counted over presents only; `ideas` is the separate section's size. */
+  stats: {
+    total: number;
+    free: number;
+    ideas: number;
+    minCents: number | null;
+    maxCents: number | null;
+  };
 };
 
 /**
@@ -176,12 +187,22 @@ export async function getPublicList(
       boughtCount: itemClaims.filter((claim) => claim.markedBought).length,
       claimedByViewer: viewerClaim !== undefined,
       boughtByViewer: viewerClaim?.markedBought ?? false,
-      unitsFree: Math.max(item.quantity - claimedCount, 0),
+      // An idea is never used up, so a claim on one consumes nothing; see
+      // isStillOpen, which is what actually decides whether a card is open.
+      unitsFree:
+        item.kind === "idea"
+          ? item.quantity
+          : Math.max(item.quantity - claimedCount, 0),
       deliveryAddress: viewerClaim ? list.deliveryAddress : null,
     };
   });
 
   const prices = rows.map((item) => item.priceCents).filter((p): p is number => p !== null);
+
+  // "Still free 2 of 3" is a statement about presents. An idea can never be
+  // taken, so counting them here would inflate both halves of a fraction that
+  // is meant to tell a guest how much is left to cover.
+  const gifts = publicItems.filter((item) => item.kind !== "idea");
 
   return {
     list,
@@ -189,8 +210,9 @@ export async function getPublicList(
     ownerHandle,
     viewerIsOwner,
     stats: {
-      total: publicItems.length,
-      free: publicItems.filter(isStillOpen).length,
+      total: gifts.length,
+      free: gifts.filter(isStillOpen).length,
+      ideas: publicItems.length - gifts.length,
       minCents: prices.length ? Math.min(...prices) : null,
       maxCents: prices.length ? Math.max(...prices) : null,
     },
@@ -206,6 +228,10 @@ export type ClaimOutcome = "claimed" | "gone" | "already-yours" | "missing";
  * so the insert carries its own condition: the row is written only if the live
  * claim count is still below the quantity. SQLite applies that as a single
  * statement, so there is no window between the check and the write.
+ *
+ * An idea has no units to run out of, so it is capped by nothing and the race
+ * above cannot happen: both guests are meant to win. The partial unique index
+ * still stops either of them taking the same one twice.
  */
 export async function claimItem(
   itemId: string,
@@ -215,14 +241,16 @@ export async function claimItem(
   const item = await db.select().from(items).where(eq(items.id, itemId)).get();
   if (!item) return "missing";
 
+  const capacity = item.kind === "idea" ? sql`null` : sql`${item.quantity}`;
+
   try {
     const result = db.run(sql`
       insert into ${claims} (id, item_id, guest_token, first_name, marked_bought, created_at)
       select ${crypto.randomUUID()}, ${itemId}, ${guestToken}, ${firstName}, 0, unixepoch()
-      where (
+      where ${capacity} is null or (
         select count(*) from ${claims}
         where item_id = ${itemId} and released_at is null
-      ) < ${item.quantity}
+      ) < ${capacity}
     `);
 
     return result.changes > 0 ? "claimed" : "gone";

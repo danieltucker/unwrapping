@@ -74,14 +74,16 @@ export function AddGiftForm({
       <form action={previewAction}>
         <input type="hidden" name="handle" value={handle} />
         <input type="hidden" name="key" value={listKey} />
-        <Input
+        {/* A textarea, not a one-line input: what a share sheet puts on the
+            clipboard is usually a paragraph with the link buried in it, and a
+            box that shows one line of it looks like the wrong box to paste in. */}
+        <Textarea
           name="url"
-          type="text"
-          inputMode="url"
+          rows={2}
           autoFocus
           placeholder="kinto-europe.com/slow-coffee…"
           className="mb-3 font-mono text-sm"
-          aria-label="Link to the gift"
+          aria-label="Link to the gift, or the whole message you copied"
         />
         {preview.error ? (
           <p role="alert" className="mb-3 text-xs font-medium text-rose-dark">
@@ -89,7 +91,8 @@ export function AddGiftForm({
           </p>
         ) : null}
         <p className="mb-5 text-xs leading-[1.6] text-ink-66">
-          Most shops fill in automatically.
+          Paste the whole thing if you shared it from an app: we&rsquo;ll find the
+          link in it. Most shops fill in automatically.
         </p>
         <Button type="submit" className="w-full">
           Fetch the details
@@ -129,6 +132,21 @@ export function AddGiftForm({
           <span className="block text-sm font-semibold">Ask for money instead</span>
           <span className="block text-xs text-ink-72">
             Toward something big, or just cash. Guests give what they like
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setKind("idea");
+            setManual(EMPTY_MANUAL);
+          }}
+          className="w-full rounded-control border border-ink-line bg-surface px-[15px] py-[13px] text-left transition-colors duration-150 hover:bg-ink/[.03]"
+        >
+          <span className="block text-sm font-semibold">Suggest an idea</span>
+          <span className="block text-xs text-ink-72">
+            &ldquo;Knitting&rdquo;, &ldquo;Xbox games&rdquo;. A direction to shop
+            in, for guests who&rsquo;d rather choose
           </span>
         </button>
       </div>
@@ -189,9 +207,11 @@ function ConfirmGift({
   const [isGroupGift, setIsGroupGift] = useState(false);
   const uploadDialog = useRef<HTMLDialogElement>(null);
 
-  // Cash has no price, no quantity and no choice about chipping in, so those
-  // controls are not shown rather than shown and ignored.
+  // Cash has no price, no quantity and no choice about chipping in, and an
+  // idea has none of those either, so those controls are not shown rather than
+  // shown and ignored.
   const cash = kind === "cash";
+  const idea = kind === "idea";
 
   const priceValue = centsToInput(result.priceCents);
 
@@ -209,11 +229,20 @@ function ConfirmGift({
 
         {result.error ? (
           <p className="mb-5 rounded-control border border-amber/30 bg-amber-wash px-[13px] py-[10px] text-xs font-medium text-amber-dark">
-            {result.error} The link is kept. Fill in what you know.
+            {result.error}{" "}
+            {/* Nothing in the paste was a link, so there is none to have kept
+                and saying so would be a small lie in an error message. */}
+            {result.url ? "The link is kept. " : ""}
+            Fill in what you know.
           </p>
         ) : cash ? (
           <p className="mb-5 rounded-control bg-rose-wash px-[13px] py-[10px] text-xs font-semibold text-rose-dark">
             Guests put in what they like. Nothing is charged here.
+          </p>
+        ) : idea ? (
+          <p className="mb-5 rounded-control bg-violet-wash px-[13px] py-[10px] text-xs font-semibold text-violet-hover">
+            Ideas sit in their own section and never run out, so more than one
+            guest can go this way.
           </p>
         ) : result.url === "" ? (
           /* Nothing was fetched, so there is nothing to check. */
@@ -245,13 +274,15 @@ function ConfirmGift({
                 name="title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder={cash ? "Toward the honeymoon" : undefined}
+                placeholder={
+                  cash ? "Toward the honeymoon" : idea ? "Knitting" : undefined
+                }
                 required
                 maxLength={160}
                 className="py-[9px] text-sm"
               />
             </div>
-            {cash ? null : (
+            {cash || idea ? null : (
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label htmlFor="price">
@@ -290,10 +321,12 @@ function ConfirmGift({
         <div className="mb-4">
           <label htmlFor="reason">
             <CapsLabel className="mb-[5px] text-2xs">
-              {cash ? "What it's for" : "Why you want it"}
+              {cash ? "What it's for" : idea ? "What to look for" : "Why you want it"}
             </CapsLabel>
           </label>
-          {/* This copy is what makes the public list feel personal. */}
+          {/* This copy is what makes the public list feel personal, and on an
+              idea it is doing most of the work: it is the only place a guest
+              finds out what sort of thing would land well. */}
           <Textarea
             id="reason"
             name="reason"
@@ -302,7 +335,9 @@ function ConfirmGift({
             placeholder={
               cash
                 ? "We're putting everything toward the honeymoon, so this helps more than anything wrapped."
-                : "Mine cracked in the move and I've been drinking sad instant coffee since July."
+                : idea
+                  ? "She's just started and has almost no supplies yet. Chunky wool, bamboo needles, that sort of thing."
+                  : "Mine cracked in the move and I've been drinking sad instant coffee since July."
             }
             className="text-sm"
           />
@@ -313,7 +348,7 @@ function ConfirmGift({
             <span className="text-sm font-semibold">Mark as most wanted</span>
             <input type="checkbox" name="isMostWanted" className="h-4 w-4 accent-violet" />
           </label>
-          {cash ? null : (
+          {cash || idea ? null : (
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-control border border-ink-line bg-surface px-[13px] py-[11px]">
               <span>
                 <span className="block text-sm font-semibold">

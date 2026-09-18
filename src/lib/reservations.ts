@@ -1,9 +1,9 @@
 import "server-only";
 
-import { and, eq, isNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, isNull, ne, sql, type SQL } from "drizzle-orm";
 
 import { db } from "@/db";
-import { claims, items, lists, users } from "@/db/schema";
+import { claims, items, lists, users, type ItemKind } from "@/db/schema";
 import { outboundHref } from "@/lib/outbound";
 import { listSegments, publicList } from "@/lib/routes";
 import { viewerScope } from "@/lib/viewer";
@@ -11,6 +11,8 @@ import { viewerScope } from "@/lib/viewer";
 export type Reservation = {
   claimId: string;
   itemId: string;
+  /** "idea" means nobody else was shut out of it; the wording follows. */
+  kind: ItemKind;
   title: string;
   priceCents: number | null;
   image: string | null;
@@ -93,6 +95,7 @@ export async function getGuestReservations(): Promise<{
     return {
       claimId: claim.id,
       itemId: item.id,
+      kind: item.kind,
       title: item.title,
       priceCents: item.priceCents,
       image: item.images[item.selectedImageIndex] ?? item.images[0] ?? null,
@@ -135,17 +138,21 @@ export async function getGuestReservations(): Promise<{
 
   const invitedLists: InvitedList[] = [];
   for (const [listId, meta] of seen) {
+    // Presents only, on both sides of the subtraction. An idea has no unit to
+    // be free and several guests may hold one at once, so counting them here
+    // would let the claims outnumber the units and read as "nothing left".
     const counts = await db
       .select({
         units: sql<number>`coalesce(sum(${items.quantity}), 0)`,
         taken: sql<number>`(
           select count(*) from ${claims}
           join ${items} as i on i.id = ${claims.itemId}
-          where i.list_id = ${listId} and ${claims.releasedAt} is null
+          where i.list_id = ${listId} and i.kind <> 'idea'
+            and ${claims.releasedAt} is null
         )`,
       })
       .from(items)
-      .where(eq(items.listId, listId))
+      .where(and(eq(items.listId, listId), ne(items.kind, "idea")))
       .get();
 
     // Spelled out rather than spread: the map also carries the delivery address,

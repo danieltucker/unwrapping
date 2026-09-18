@@ -46,6 +46,10 @@ export function ReserveDialog({
   // hold of it. Someone signed in already has that, so get out of their way.
   const offerAccount = Boolean(state.ok) && !signedIn;
 
+  // An idea is not reserved and cannot be taken off anyone, so every line here
+  // that promises exclusivity has to say something else instead.
+  const idea = item.kind === "idea";
+
   useEffect(() => {
     if (state.ok && signedIn) dialog.current?.close();
   }, [state.ok, signedIn]);
@@ -61,22 +65,23 @@ export function ReserveDialog({
             : "w-full rounded-pill border border-violet/45 py-3 text-sm font-semibold text-violet transition-colors duration-150 hover:bg-violet-wash"
         }
       >
-        I&rsquo;ll get this one
+        {idea ? "I’ll get something like this" : "I’ll get this one"}
       </button>
 
       <Modal dialogRef={dialog} labelledBy={`reserve-heading-${item.id}`}>
         {offerAccount ? (
           <div className="p-7">
             <p className="mb-2 rounded-control bg-pine-wash py-2.5 pl-3.5 pr-12 text-xs font-semibold text-pine-dark">
-              ✓ Reserved. It now shows as taken to other guests
+              {idea
+                ? "✓ You’re down for this. It stays on the list for everyone else"
+                : "✓ Reserved. It now shows as taken to other guests"}
             </p>
             <h2 className="mb-2 font-display text-2xl leading-tight tracking-[-0.02em]">
               Don&rsquo;t lose track of it
             </h2>
             <p className="mb-5 text-sm leading-relaxed text-ink-76">
-              This reservation is remembered in this browser only. An account keeps
-              it wherever you sign in, and the owner still won&rsquo;t see who
-              reserved what.
+              This is remembered in this browser only. An account keeps it wherever
+              you sign in, and the owner still won&rsquo;t see who took what.
             </p>
             <Link
               href={routes.signUp}
@@ -104,10 +109,12 @@ export function ReserveDialog({
             id={`reserve-heading-${item.id}`}
             className="mb-2 font-display text-[1.75rem] leading-[1.1] tracking-[-.7px]"
           >
-            Reserve this gift?
+            {idea ? "Going this way?" : "Reserve this gift?"}
           </h2>
           <p className="mb-5 text-sm leading-[1.7] text-ink/78">
-            {visibility(surpriseMode).reserving}
+            {idea
+              ? visibility(surpriseMode).takingOnIdea
+              : visibility(surpriseMode).reserving}
           </p>
 
           {needsFirstName ? (
@@ -142,7 +149,13 @@ export function ReserveDialog({
             disabled={pending}
             className="mb-3 w-full rounded-pill bg-violet py-[14px] text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover disabled:opacity-60"
           >
-            {pending ? "Reserving…" : "Yes, reserve it"}
+            {idea
+              ? pending
+                ? "Saving…"
+                : "Yes, count me in"
+              : pending
+                ? "Reserving…"
+                : "Yes, reserve it"}
           </button>
           <button
             type="button"
@@ -168,12 +181,15 @@ export function ReleaseButton({
   itemId,
   handle,
   listKey,
+  label = "Release it",
   size = "md",
   className = "w-full",
 }: {
   itemId: string;
   handle: string;
   listKey: string;
+  /** An idea is never held, so it is stepped away from rather than released. */
+  label?: string;
   size?: "sm" | "md";
   className?: string;
 }) {
@@ -194,7 +210,7 @@ export function ReleaseButton({
         disabled={pending}
         className="w-full text-ink-72"
       >
-        {pending ? "Releasing…" : "Release it"}
+        {pending ? "Releasing…" : label}
       </Button>
       {state.error ? (
         <p role="alert" className="mt-2 text-xs text-rose-dark">

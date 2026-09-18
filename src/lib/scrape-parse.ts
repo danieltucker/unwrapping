@@ -26,8 +26,71 @@ export function sourceDomain(url: string | null | undefined): string | null {
   }
 }
 
+/**
+ * Share text runs a link into the sentence around it, and the punctuation that
+ * ends the sentence is not part of the address. A closing bracket is the one
+ * exception: it belongs to the URL when the URL opened it.
+ */
+function trimUrlPunctuation(candidate: string): string {
+  const closers: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
+  let url = candidate;
+
+  while (url.length > 1) {
+    const last = url[url.length - 1];
+
+    if (".,;:!?\"'«»".includes(last)) {
+      url = url.slice(0, -1);
+      continue;
+    }
+
+    const opener = closers[last];
+    if (opener) {
+      const opened = url.split(opener).length - 1;
+      const closed = url.split(last).length - 1;
+      if (closed > opened) {
+        url = url.slice(0, -1);
+        continue;
+      }
+    }
+
+    break;
+  }
+
+  return url;
+}
+
+/**
+ * Pulls the link out of whatever was pasted.
+ *
+ * Share sheets rarely hand over a bare address. Amazon's puts the entire
+ * product title in front of the link, others wrap it in "Check this out" or
+ * add a plug for their app behind it. The link is the only part we can use, so
+ * find it and drop the rest rather than making someone edit the paste down by
+ * hand on a phone.
+ *
+ * The first address wins: share text leads with the thing being shared, and a
+ * second link in it is the sharer's own app or profile.
+ */
+export function extractUrl(input: string): string | null {
+  const text = input.trim();
+  if (!text) return null;
+
+  // An explicit scheme is unambiguous, so it counts wherever in the text it is.
+  const explicit = text.match(/https?:\/\/[^\s<>"'`]+/i);
+  if (explicit) return trimUrlPunctuation(explicit[0]);
+
+  // No scheme, but "www.shop.com/thing" mid-sentence is still plainly a link.
+  const www = text.match(/(^|\s)(www\.[^\s<>"'`]+)/i);
+  if (www) return trimUrlPunctuation(www[2]);
+
+  // Nothing here announces itself as a link. A single token may still be one
+  // ("kinto-europe.com/slow-coffee"), so let normalizeUrl judge it. A sentence
+  // is not, and hunting for a domain inside prose turns "e.g." into a website.
+  return /\s/.test(text) ? null : text;
+}
+
 export function normalizeUrl(input: string): string | null {
-  const trimmed = input.trim();
+  const trimmed = extractUrl(input);
   if (!trimmed) return null;
 
   const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;

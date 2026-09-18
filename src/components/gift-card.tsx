@@ -1,3 +1,4 @@
+import { CardPhoto } from "@/components/card-photo";
 import { ChipInDialog } from "@/components/chip-in-dialog";
 import { FundingBar } from "@/components/funding";
 import { fundingLine, isFullyFunded } from "@/lib/funding";
@@ -57,28 +58,12 @@ export function GiftCard({
 
   return (
     <li className="flex flex-col overflow-hidden rounded-card border border-ink-line bg-surface">
-      <div className="relative h-[250px] bg-ink/[.035]">
-        {item.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.image}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        ) : item.emoji ? (
-          <span className="flex h-full items-center justify-center text-[5rem] leading-none">
-            {item.emoji}
-          </span>
-        ) : (
-          <span className="flex h-full items-center justify-center px-6 text-center text-xs text-ink-62">
-            No photo for this one
-          </span>
-        )}
-        {settled ? (
-          <span className="pointer-events-none absolute inset-0 bg-paper/50" />
-        ) : null}
-      </div>
+      <CardPhoto
+        image={item.image}
+        emoji={item.emoji}
+        fallback="No photo for this one"
+        dimmed={settled}
+      />
 
       <div className={`h-1 ${band}`} aria-hidden="true" />
 

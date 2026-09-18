@@ -7,9 +7,11 @@ import { reorderGifts } from "@/app/lists/[handle]/[slug]/manage/actions";
 import { FundingBar } from "@/components/funding";
 import { fundingLine } from "@/lib/funding";
 import { formatPrice } from "@/config/site";
+import type { ItemKind } from "@/db/schema";
 
 export type EditorRow = {
   id: string;
+  kind: ItemKind;
   title: string;
   image: string | null;
   emoji: string | null;
@@ -277,6 +279,7 @@ function GiftRow({
       <div className="min-w-0 flex-1">
         <div className="mb-[3px] flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold">{row.title}</span>
+          {row.kind === "idea" ? <Badge tone="neutral">Idea</Badge> : null}
           {row.isMostWanted ? <Badge tone="violet">Most wanted</Badge> : null}
           {row.isGroupGift ? (
             <Badge tone="rose">
@@ -306,15 +309,27 @@ function GiftRow({
           >
             {needsPhoto
               ? "No photo found. Items with a photo get claimed far more often"
-              : [row.sourceDomain ?? "Added by hand · no link", `qty ${row.quantity}`].join(
-                  " · ",
-                )}
+              : row.kind === "idea"
+                ? // No link, no price and no quantity to report, so the line
+                  // says the one thing an owner might want: how many guests
+                  // have gone this way. Null on a surprise list.
+                  row.claimedCount === null
+                    ? "A direction to shop in, not one present"
+                    : `${row.claimedCount} ${row.claimedCount === 1 ? "person is" : "people are"} going this way`
+                : [
+                    row.sourceDomain ?? "Added by hand · no link",
+                    `qty ${row.quantity}`,
+                  ].join(" · ")}
           </p>
         )}
       </div>
 
       <span className="text-base font-semibold">
-        {row.priceCents === null ? "-" : formatPrice(row.priceCents)}
+        {row.kind === "idea"
+          ? ""
+          : row.priceCents === null
+            ? "-"
+            : formatPrice(row.priceCents)}
       </span>
 
       <Link

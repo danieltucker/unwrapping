@@ -51,8 +51,10 @@ export async function updateItem(
   if (!title) return { error: "A gift needs a title." };
 
   const rawPrice = String(formData.get("price") ?? "").trim();
-  const priceCents = rawPrice ? parsePriceToCents(rawPrice) : null;
-  if (rawPrice && priceCents === null) {
+  // An idea is a direction, not a purchase; it has no price to edit.
+  const priceCents =
+    item.kind === "idea" || !rawPrice ? null : parsePriceToCents(rawPrice);
+  if (item.kind !== "idea" && rawPrice && priceCents === null) {
     return { error: "That price didn't look like a number." };
   }
 
@@ -73,8 +75,11 @@ export async function updateItem(
   const emoji = parseGiftEmoji(formData.get("emoji"));
 
   // A gift cannot change kind after it exists: the guests looking at it have
-  // been told what it is. Cash stays a group gift.
-  const isGroupGift = item.kind === "cash" || formData.get("isGroupGift") === "on";
+  // been told what it is. Cash stays a group gift; an idea has no price to
+  // split and so never becomes one.
+  const isGroupGift =
+    item.kind === "cash" ||
+    (item.kind === "thing" && formData.get("isGroupGift") === "on");
   const rawGoal = String(formData.get("goal") ?? "").trim();
   const parsedGoal = rawGoal ? parsePriceToCents(rawGoal) : null;
   if (isGroupGift && rawGoal && parsedGoal === null) {
@@ -86,7 +91,7 @@ export async function updateItem(
     .set({
       title,
       priceCents,
-      quantity: item.kind === "cash" ? 1 : quantity,
+      quantity: item.kind === "thing" ? quantity : 1,
       selectedImageIndex,
       emoji,
       reason: String(formData.get("reason") ?? "").trim() || null,

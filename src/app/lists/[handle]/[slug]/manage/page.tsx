@@ -67,6 +67,7 @@ export default async function EditorPage({
 
   const rows: EditorRow[] = gifts.map((gift) => ({
     id: gift.id,
+    kind: gift.kind,
     title: gift.title,
     image: gift.images[gift.selectedImageIndex] ?? gift.images[0] ?? null,
     emoji: gift.emoji,
@@ -93,10 +94,18 @@ export default async function EditorPage({
     .map((gift) => gift.priceCents)
     .filter((price): price is number => price !== null);
 
+  // Ideas are counted apart from presents here for the same reason they are on
+  // the public list: they are not things anyone is buying.
+  const ideaCount = gifts.filter((gift) => gift.kind === "idea").length;
+  const giftCount = gifts.length - ideaCount;
+
   const meta = [
-    gifts.length === 0
+    giftCount === 0 && ideaCount === 0
       ? "No gifts yet"
-      : `${gifts.length} ${gifts.length === 1 ? "gift" : "gifts"}`,
+      : giftCount === 0
+        ? null
+        : `${giftCount} ${giftCount === 1 ? "gift" : "gifts"}`,
+    ideaCount === 0 ? null : `${ideaCount} ${ideaCount === 1 ? "idea" : "ideas"}`,
     prices.length
       ? `${formatPrice(Math.min(...prices))} – ${formatPrice(Math.max(...prices))}`
       : null,

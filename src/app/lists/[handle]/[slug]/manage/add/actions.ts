@@ -43,29 +43,35 @@ export async function addGift(
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "A gift needs a title." };
 
-  // Cash is the only kind that changes the shape of the row; anything else
-  // posted in is a gift like any other.
-  const kind: ItemKind = formData.get("kind") === "cash" ? "cash" : "thing";
+  // Only "cash" and "idea" change the shape of the row; anything else posted
+  // in is a gift like any other.
+  const posted = formData.get("kind");
+  const kind: ItemKind =
+    posted === "cash" ? "cash" : posted === "idea" ? "idea" : "thing";
 
-  const url = kind === "cash" ? null : String(formData.get("url") ?? "").trim() || null;
+  // Neither money nor an idea points at a product page.
+  const url =
+    kind === "thing" ? String(formData.get("url") ?? "").trim() || null : null;
 
   const rawPrice = String(formData.get("price") ?? "").trim();
-  const priceCents = rawPrice ? parsePriceToCents(rawPrice) : null;
-  if (rawPrice && priceCents === null) {
+  // An idea is a direction, not a purchase, so it carries no price even if one
+  // were posted in.
+  const priceCents = kind === "idea" || !rawPrice ? null : parsePriceToCents(rawPrice);
+  if (kind !== "idea" && rawPrice && priceCents === null) {
     return { error: "That price didn't look like a number." };
   }
 
-  // Money has no quantity.
+  // Money has no quantity, and an idea has no units to run out of.
   const quantity =
-    kind === "cash"
-      ? 1
-      : Math.min(
+    kind === "thing"
+      ? Math.min(
           Math.max(
             Number.parseInt(String(formData.get("quantity") ?? "1"), 10) || 1,
             1,
           ),
           20,
-        );
+        )
+      : 1;
 
   let images: string[] = [];
   try {
@@ -96,7 +102,9 @@ export async function addGift(
   const emoji = parseGiftEmoji(formData.get("emoji"));
 
   // Cash is always open to chipping in; there is nothing else to do with it.
-  const isGroupGift = kind === "cash" || formData.get("isGroupGift") === "on";
+  // An idea has no price to split, so it is never one.
+  const isGroupGift =
+    kind === "cash" || (kind === "thing" && formData.get("isGroupGift") === "on");
   const rawGoal = String(formData.get("goal") ?? "").trim();
   const parsedGoal = rawGoal ? parsePriceToCents(rawGoal) : null;
   if (isGroupGift && rawGoal && parsedGoal === null) {

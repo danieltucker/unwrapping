@@ -22,9 +22,13 @@ export function GiftSummary({ item }: { item: PublicItem }) {
             ? item.goalCents !== null
               ? `${formatPrice(item.goalCents)} target`
               : "Cash gift"
-            : item.priceCents !== null
-              ? formatPrice(item.priceCents)
-              : "No price"}
+            : // An idea has no price to be missing, so it says what it is
+              // rather than reporting a gap.
+              item.kind === "idea"
+              ? "An idea, not a specific present"
+              : item.priceCents !== null
+                ? formatPrice(item.priceCents)
+                : "No price"}
           {item.sourceDomain ? ` · ${item.sourceDomain}` : ""}
         </p>
       </div>

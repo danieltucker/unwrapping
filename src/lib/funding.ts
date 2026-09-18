@@ -1,4 +1,5 @@
 import { formatPrice } from "@/config/site";
+import type { ItemKind } from "@/db/schema";
 
 /**
  * Group-gift arithmetic and the words for it. Pure, so the server and the
@@ -18,11 +19,16 @@ export function isFullyFunded(raisedCents: number, goalCents: number | null): bo
 
 /** Still something a guest could act on: not claimed out, not fully funded. */
 export function isStillOpen(item: {
+  kind: ItemKind;
   isGroupGift: boolean;
   raisedCents: number;
   goalCents: number | null;
   unitsFree: number;
 }): boolean {
+  // An idea is a direction, not a present, so taking one on doesn't use it up:
+  // it is open to the next guest however many people are already on it.
+  if (item.kind === "idea") return true;
+
   return item.isGroupGift
     ? !isFullyFunded(item.raisedCents, item.goalCents)
     : item.unitsFree > 0;

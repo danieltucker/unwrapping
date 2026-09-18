@@ -39,6 +39,7 @@ export function EditGiftForm({
 
   // Kind is fixed once the gift exists, so this only decides what is shown.
   const cash = item.kind === "cash";
+  const idea = item.kind === "idea";
 
   // After an upload the server selects the new photo; follow it so the
   // preview shows what was just added rather than the old choice.
@@ -80,7 +81,7 @@ export function EditGiftForm({
                 className="py-[9px] text-sm"
               />
             </div>
-            {cash ? null : (
+            {cash || idea ? null : (
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label htmlFor="price">
@@ -119,7 +120,7 @@ export function EditGiftForm({
         <div className="mb-4">
           <label htmlFor="reason">
             <CapsLabel className="mb-[5px] text-2xs">
-              {cash ? "What it's for" : "Why you want it"}
+              {cash ? "What it's for" : idea ? "What to look for" : "Why you want it"}
             </CapsLabel>
           </label>
           <Textarea
@@ -142,7 +143,7 @@ export function EditGiftForm({
               className="h-4 w-4 accent-violet"
             />
           </label>
-          {cash ? null : (
+          {cash || idea ? null : (
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-control border border-ink-line bg-surface px-[13px] py-[11px]">
               <span>
                 <span className="block text-sm font-semibold">

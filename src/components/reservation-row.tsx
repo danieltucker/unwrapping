@@ -48,7 +48,9 @@ export function ReservationRow({
 
         <p className="mb-[5px] text-base font-semibold">
           {reservation.title}
-          {reservation.priceCents !== null ? (
+          {reservation.kind === "idea" ? (
+            <span className="font-normal text-ink-72">{" · an idea"}</span>
+          ) : reservation.priceCents !== null ? (
             <span className="font-normal text-ink-72">
               {" · "}
               {formatPrice(reservation.priceCents)}
@@ -57,8 +59,14 @@ export function ReservationRow({
         </p>
 
         {/* Said here as well as on the list, because this page is where people
-            come back to days later and the two lists may differ. */}
-        {!reservation.listIsSurprise ? (
+            come back to days later and the two lists may differ. An idea was
+            never exclusive, so the reassurance about it is a different one. */}
+        {reservation.kind === "idea" ? (
+          <p className="mb-[7px] text-xs font-medium text-ink-62">
+            Nobody else is locked out of this one: it stays on the list, and other
+            guests only see how many people are covering it.
+          </p>
+        ) : !reservation.listIsSurprise ? (
           <p className="mb-[7px] text-xs font-medium text-ink-62">
             This list isn&rsquo;t a surprise: its owner can see the gift is taken,
             never that it was you.
@@ -66,7 +74,8 @@ export function ReservationRow({
         ) : null}
 
         <p className="mb-[13px] text-xs text-ink-72">
-          Reserved by you on {reservedOn}
+          {reservation.kind === "idea" ? "You took this on" : "Reserved by you"} on{" "}
+          {reservedOn}
           {reservation.href ? (
             <>
               {" · "}
@@ -106,6 +115,7 @@ export function ReservationRow({
             itemId={reservation.itemId}
             handle={reservation.handle}
             listKey={reservation.listKey}
+            label={reservation.kind === "idea" ? "Take me off" : "Release it"}
             size="sm"
             className=""
           />

@@ -103,8 +103,18 @@ export const lists = sqliteTable(
  * "cash" is an ask for money rather than an object: no link, no photo and no
  * quantity. It is stored as a group gift in every other respect, so the
  * funding code needs no second path through it.
+ *
+ * "idea" is a direction rather than a present: "knitting", "Xbox games". It
+ * has no link, no price and no quantity, and — unlike either of the others —
+ * it is never used up. Yarn and needles are both knitting, so several guests
+ * can each take one on and it stays on the list for the next person. That is
+ * the one rule to keep in mind wherever claims are counted: see claimItem,
+ * which does not cap an idea, and isStillOpen, which never closes one.
+ *
+ * The enum is enforced in TypeScript only; the column is plain text, so adding
+ * a kind needs no migration.
  */
-export const ITEM_KINDS = ["thing", "cash"] as const;
+export const ITEM_KINDS = ["thing", "cash", "idea"] as const;
 export type ItemKind = (typeof ITEM_KINDS)[number];
 
 export const items = sqliteTable(
