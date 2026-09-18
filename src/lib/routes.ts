@@ -52,3 +52,4 @@ export const signUp = "/sign-up";
 export const newList = "/new";
 export const myLists = "/lists";
 export const reserved = "/reserved";
+export const profile = "/profile";

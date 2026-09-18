@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { items, type Item } from "@/db/schema";
 import { parseGiftEmoji } from "@/lib/emoji";
+import { moveUnderIdea } from "@/lib/item-moves";
 import { requireOwnedList, type ResolvedList } from "@/lib/list-access";
 import { sourceDomain } from "@/lib/outbound";
 import * as routes from "@/lib/routes";
@@ -109,6 +110,22 @@ export async function updateItem(
           : null,
     })
     .where(eq(items.id, itemId));
+
+  /**
+   * Which idea this present belongs under, if the panel offered the choice.
+   *
+   * The dropdown is only rendered where the move is possible at all, so a post
+   * without the field is a form that never showed one — not a request to pull
+   * the gift out of the idea it is in. An empty value *is* that request.
+   */
+  if (formData.has("parentId")) {
+    const problem = await moveUnderIdea(
+      owned.list.id,
+      item,
+      String(formData.get("parentId") ?? "").trim() || null,
+    );
+    if (problem) return { error: problem };
+  }
 
   refreshList(owned);
   return { ok: true };

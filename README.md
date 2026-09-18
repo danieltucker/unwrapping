@@ -92,6 +92,9 @@ src/app/                    routes
       items/[id]/edit/      edit one gift
       share/               create step 2: link, QR, invite
   reserved/                 the guest's own reservations, keyed to a cookie
+  profile/                  the owner's own details: picture, name, birthday.
+                            None of it reaches a guest; a list never says who
+                            made it.
   [code]/                   short link, redirects and counts the open
 src/components/             UI. ui.tsx holds the shared primitives and icons.
 src/lib/                    the actual logic; everything server-side is marked
@@ -133,6 +136,10 @@ A few things worth knowing before you change them:
   `hasReferralTags()` is false and no disclosure line renders. Planned together
   with retailer product APIs, which are the way round the shops that refuse to be
   read: [docs/referrals-and-product-data.md](docs/referrals-and-product-data.md).
+- **Anything that uses a birthday.** `users.birthday` is stored and editable on
+  the profile, and nothing reads it: no reminder, no prefilled event date on a
+  birthday list. The column exists so that can be added without asking everyone
+  for the date a second time.
 - **OAuth sign-in**, the browser extension, and the Occasions/Pricing pages.
 
 Longer-form plans live in [docs/](docs/): retailer data and referrals above,

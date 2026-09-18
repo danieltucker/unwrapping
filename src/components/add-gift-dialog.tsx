@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 
 import { AddGiftForm } from "@/components/add-gift-form";
 import { Modal } from "@/components/modal";
+import type { MovableGift } from "@/components/move-into-idea";
 import { Button } from "@/components/ui";
 
 /**
@@ -28,6 +29,7 @@ export function AddGiftDialog({
   listKey,
   parentId,
   parentTitle,
+  movable,
   className,
   children,
 }: {
@@ -37,6 +39,11 @@ export function AddGiftDialog({
   parentId?: string;
   /** The idea's title, so the panel can say what it is filling in. */
   parentTitle?: string;
+  /**
+   * Presents already on the list that could be moved under this idea instead
+   * of a new one being added. Only ever passed alongside a parent.
+   */
+  movable?: MovableGift[];
   /** Styles the trigger itself. Without one it is the product's own button. */
   className?: string;
   children: ReactNode;
@@ -80,6 +87,7 @@ export function AddGiftDialog({
           listKey={listKey}
           parentId={parentId}
           parentTitle={parentTitle}
+          movable={movable}
           onDone={() => dialog.current?.close()}
         />
       </Modal>

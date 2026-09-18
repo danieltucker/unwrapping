@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 
 import { EditGiftForm } from "@/components/edit-gift-form";
 import { Modal } from "@/components/modal";
+import type { IdeaOption } from "@/components/move-into-idea";
 import type { Item } from "@/db/schema";
 
 /**
@@ -16,6 +17,7 @@ import type { Item } from "@/db/schema";
 export function EditGiftDialog({
   item,
   childCount,
+  ideas,
   handle,
   listKey,
   className,
@@ -27,6 +29,8 @@ export function EditGiftDialog({
    * that is the one thing about this panel worth warning someone about.
    */
   childCount: number;
+  /** Every idea on this list, for the "part of an idea" dropdown. */
+  ideas: IdeaOption[];
   handle: string;
   listKey: string;
   /** Styles the trigger: the row's own Edit control, or its amber Fix it. */
@@ -69,6 +73,7 @@ export function EditGiftDialog({
             key={instance}
             item={item}
             childCount={childCount}
+            ideas={ideas}
             handle={handle}
             listKey={listKey}
             onDone={() => dialog.current?.close()}

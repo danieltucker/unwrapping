@@ -28,6 +28,22 @@ export const users = sqliteTable("users", {
   // later without a migration.
   emailVerifiedAt: integer("email_verified_at", { mode: "timestamp" }),
   name: text("name").notNull(),
+  /**
+   * A photo of themselves, stored the same way a gift photo is: written to
+   * data/uploads and served by /uploads/<name>. Null is the ordinary state,
+   * and the one every avatar has to keep drawing for — see AccountMenu, which
+   * falls back to initials.
+   */
+  avatarUrl: text("avatar_url"),
+  /**
+   * Their own birthday, at local midnight like a list's event date, so it
+   * reads back as the day they typed rather than the day before.
+   *
+   * The year is part of it because a date input gives us one; nothing displays
+   * it, and nothing should start without asking them. Nothing is scheduled off
+   * this yet.
+   */
+  birthday: integer("birthday", { mode: "timestamp" }),
   passwordHash: text("password_hash").notNull(),
   createdAt: createdAt(),
 });

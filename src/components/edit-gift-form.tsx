@@ -15,6 +15,7 @@ import {
   usePhotoPaste,
 } from "@/components/gift-photo-fields";
 import { GoalField } from "@/components/goal-field";
+import { IdeaField, type IdeaOption } from "@/components/move-into-idea";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
 import { centsToInput } from "@/config/site";
 import type { Item } from "@/db/schema";
@@ -25,10 +26,17 @@ type ListKeys = { handle: string; listKey: string };
 export function EditGiftForm({
   item,
   childCount,
+  ideas,
   handle,
   listKey,
   onDone,
-}: { item: Item; childCount: number; onDone: () => void } & ListKeys) {
+}: {
+  item: Item;
+  childCount: number;
+  /** Every idea on this list, for the "part of an idea" dropdown. */
+  ideas: IdeaOption[];
+  onDone: () => void;
+} & ListKeys) {
   const [state, action, pending] = useActionState<EditItemState, FormData>(
     updateItem,
     {},
@@ -154,6 +162,13 @@ export function EditGiftForm({
             className="text-sm"
           />
         </div>
+
+        {/* Only a present moves: an idea is always top level, and cash has no
+            place under a shopping direction. With no ideas on the list there
+            is nothing to choose between, so the control stays away. */}
+        {item.kind === "thing" && ideas.length > 0 ? (
+          <IdeaField ideas={ideas} value={item.parentId} />
+        ) : null}
 
         <div className="mb-5 flex flex-col gap-2">
           <label className="flex cursor-pointer items-center justify-between rounded-control border border-ink-line bg-surface px-[13px] py-[11px]">

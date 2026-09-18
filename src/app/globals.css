@@ -124,6 +124,48 @@
   }
 }
 
+/* The two skins the site header wears.
+ *
+ * The bar is the inverse of whatever is under it: violet over the paper pages,
+ * which is nearly all of them, and paper over the guest's view of a list, which
+ * opens with the dark rail. Set as custom properties on the <header> rather
+ * than as classes on each control, because the identity cluster inside it is
+ * rendered on the server and cannot be handed a prop by the client component
+ * that decides the tone. Inheritance carries it instead. See HeaderBar. */
+@utility header-paper {
+  --header-bg: var(--color-paper);
+  --header-border: var(--color-ink-line);
+  --header-fg: var(--color-ink);
+  --header-muted: var(--color-ink-76);
+  --header-line: var(--color-ink-line-strong);
+  --header-pill: var(--color-surface);
+  --header-wash: rgba(23, 17, 43, 0.05);
+  /* The filled control in the cluster: "Start a list", and the avatar. */
+  --header-accent: var(--color-violet);
+  --header-accent-fg: #ffffff;
+  --header-accent-hover: var(--color-violet-hover);
+}
+
+@utility header-violet {
+  --header-bg: var(--color-violet);
+  --header-border: rgba(23, 17, 43, 0.12);
+  --header-fg: var(--color-paper);
+  --header-muted: rgba(250, 248, 245, 0.78);
+  --header-line: rgba(250, 248, 245, 0.3);
+  --header-pill: rgba(250, 248, 245, 0.14);
+  --header-wash: rgba(250, 248, 245, 0.18);
+  /* Inverted with the bar: paper fill, violet label. */
+  --header-accent: var(--color-paper);
+  --header-accent-fg: var(--color-violet);
+  --header-accent-hover: #ffffff;
+}
+
+/* The base focus ring is violet, which vanishes into the violet bar. Unlayered
+   so it outranks the layered rule it is correcting. */
+.header-violet :focus-visible {
+  outline-color: var(--color-paper);
+}
+
 /* The spec's focus treatment for bordered controls: a violet border plus a soft ring. */
 @utility focus-ring {
   &:focus-visible {

@@ -6,6 +6,7 @@ import { reorderGifts } from "@/app/lists/[handle]/[slug]/manage/actions";
 import { AddGiftDialog } from "@/components/add-gift-dialog";
 import { EditGiftDialog } from "@/components/edit-gift-dialog";
 import { FundingBar } from "@/components/funding";
+import type { IdeaOption, MovableGift } from "@/components/move-into-idea";
 import { fundingLine } from "@/lib/funding";
 import { formatPrice } from "@/config/site";
 import type { Item } from "@/db/schema";
@@ -78,6 +79,33 @@ export function GiftRows({
 
   const everything = flatten(rows);
 
+  /**
+   * What a move needs, worked out once for the whole list rather than per row:
+   * every idea a present could go under, and every present that could go under
+   * one.
+   *
+   * Both are the full list, not the filtered one. A filter decides what is on
+   * screen; it has no business deciding what a gift is allowed to belong to.
+   */
+  const ideas: IdeaOption[] = everything
+    .filter((row) => row.item.kind === "idea")
+    .map((row) => ({ id: row.item.id, title: row.item.title }));
+
+  const titles = new Map(everything.map((row) => [row.item.id, row.item.title]));
+
+  const movable: MovableGift[] = everything
+    .filter((row) => row.item.kind === "thing")
+    .map((row) => ({
+      id: row.item.id,
+      title: row.item.title,
+      priceCents: row.item.priceCents,
+      image: row.item.images[row.item.selectedImageIndex] ?? row.item.images[0] ?? null,
+      emoji: row.item.emoji,
+      parentTitle: row.item.parentId
+        ? (titles.get(row.item.parentId) ?? null)
+        : null,
+    }));
+
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -125,6 +153,8 @@ export function GiftRows({
         rows={rows}
         parentId={null}
         filter={filter}
+        ideas={ideas}
+        movable={movable}
         handle={handle}
         listKey={listKey}
         onError={setError}
@@ -153,6 +183,8 @@ function RowGroup({
   rows,
   parentId,
   filter,
+  ideas,
+  movable,
   handle,
   listKey,
   onError,
@@ -160,6 +192,9 @@ function RowGroup({
   rows: EditorRow[];
   parentId: string | null;
   filter: Filter;
+  /** Every idea on the list, and every present that could move under one. */
+  ideas: IdeaOption[];
+  movable: MovableGift[];
   handle: string;
   listKey: string;
   onError: (message: string | null) => void;
@@ -232,6 +267,8 @@ function RowGroup({
           key={row.item.id}
           row={row}
           filter={filter}
+          ideas={ideas}
+          movable={movable}
           handle={handle}
           listKey={listKey}
           nested={parentId !== null}
@@ -259,6 +296,8 @@ function RowGroup({
 function GiftRow({
   row,
   filter,
+  ideas,
+  movable,
   handle,
   listKey,
   nested,
@@ -274,6 +313,8 @@ function GiftRow({
 }: {
   row: EditorRow;
   filter: Filter;
+  ideas: IdeaOption[];
+  movable: MovableGift[];
   handle: string;
   listKey: string;
   /** A present inside an idea: quieter, and never an idea itself. */
@@ -431,6 +472,7 @@ function GiftRow({
         <EditGiftDialog
           item={row.item}
           childCount={row.children.length}
+          ideas={ideas}
           handle={handle}
           listKey={listKey}
           className={
@@ -460,6 +502,8 @@ function GiftRow({
                 rows={row.children}
                 parentId={row.item.id}
                 filter={filter}
+                ideas={ideas}
+                movable={movable}
                 handle={handle}
                 listKey={listKey}
                 onError={onError}
@@ -472,6 +516,12 @@ function GiftRow({
             listKey={listKey}
             parentId={row.item.id}
             parentTitle={row.item.title}
+            // Everything except the presents this idea already holds: offering
+            // to move one into where it already is would be a control that
+            // does nothing.
+            movable={movable.filter(
+              (gift) => !row.children.some((child) => child.item.id === gift.id),
+            )}
             className="w-full rounded-control border border-dashed border-ink-line-strong px-[13px] py-[9px] text-xs font-semibold text-ink-72 transition-colors duration-150 hover:bg-ink/[.03]"
           >
             + Add a gift to &ldquo;{row.item.title}&rdquo;

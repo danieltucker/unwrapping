@@ -4,21 +4,21 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { signOut } from "@/app/sign-in/actions";
-
-/** Two initials from a name: "Daniel Tucker" → "DT". */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((part) => part.charAt(0).toUpperCase()).join("") || "?";
-}
+import { Avatar } from "@/components/ui";
 
 export function AccountMenu({
   name,
+  avatarUrl,
   reservedCount,
   listsHref,
+  profileHref,
 }: {
   name: string;
+  /** Their own photo, or null for the circle of initials. */
+  avatarUrl: string | null;
   reservedCount: number;
   listsHref: string;
+  profileHref: string;
 }) {
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);
@@ -45,21 +45,25 @@ export function AccountMenu({
 
   return (
     <div className="relative" ref={container}>
+      {/* The colours are the bar's, inherited: this same control sits on the
+          violet header and on the paper one. See globals.css. */}
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Account menu for ${name}`}
-        className="flex h-8 w-8 items-center justify-center rounded-pill bg-violet text-xs font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
+        className="flex rounded-pill transition-opacity duration-150 hover:opacity-90 focus-ring"
       >
-        {initials(name)}
+        <Avatar name={name} url={avatarUrl} size={32} />
       </button>
 
       {open ? (
+        /* The panel hangs below the bar, over the page, so it keeps the
+           product's own light surface on either tone. */
         <div
           role="menu"
-          className="absolute right-0 top-10 z-10 w-56 overflow-hidden rounded-card border border-ink-line bg-paper shadow-card"
+          className="absolute right-0 top-10 z-10 w-56 overflow-hidden rounded-card border border-ink-line bg-paper text-ink shadow-card"
         >
           <p className="border-b border-ink-line px-4 py-3 text-xs text-ink-62">
             Signed in as <span className="font-semibold text-ink">{name}</span>
@@ -86,6 +90,15 @@ export function AccountMenu({
                 {reservedCount}
               </span>
             ) : null}
+          </Link>
+
+          <Link
+            href={profileHref}
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-3 text-sm font-medium hover:bg-ink/[.03]"
+          >
+            Your profile
           </Link>
 
           <form action={signOut} className="border-t border-ink-line">

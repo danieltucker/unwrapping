@@ -15,6 +15,7 @@ import {
   usePhotoPaste,
 } from "@/components/gift-photo-fields";
 import { GoalField } from "@/components/goal-field";
+import { MoveIntoIdea, type MovableGift } from "@/components/move-into-idea";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
 import { centsToInput } from "@/config/site";
 import type { ItemKind } from "@/db/schema";
@@ -39,7 +40,16 @@ type FormKeys = { handle: string; listKey: string };
  * the panel says out loud, and a panel that claimed to be filling in an idea it
  * could not name would be worse than one that said nothing.
  */
-type Parent = { parentId?: string; parentTitle?: string };
+type Parent = {
+  parentId?: string;
+  parentTitle?: string;
+  /**
+   * The presents already on the list that could be moved under this idea.
+   * Only ever populated alongside a parent: there is nothing to move a gift
+   * into when the panel is adding to the list itself.
+   */
+  movable?: MovableGift[];
+};
 
 /**
  * Adding a gift, in as many goes as it takes.
@@ -54,6 +64,7 @@ export function AddGiftForm({
   listKey,
   parentId,
   parentTitle,
+  movable,
   onDone,
 }: FormKeys & Parent & { onDone: () => void }) {
   const [attempt, setAttempt] = useState(0);
@@ -65,6 +76,7 @@ export function AddGiftForm({
       listKey={listKey}
       parentId={parentId}
       parentTitle={parentTitle}
+      movable={movable}
       onDone={onDone}
       onStartOver={() => setAttempt((count) => count + 1)}
     />
@@ -76,6 +88,7 @@ function AddGiftFlow({
   listKey,
   parentId,
   parentTitle,
+  movable = [],
   onDone,
   onStartOver,
 }: FormKeys & Parent & { onDone: () => void; onStartOver: () => void }) {
@@ -85,6 +98,9 @@ function AddGiftFlow({
   );
   const [manual, setManual] = useState<ScrapeResult | null>(null);
   const [kind, setKind] = useState<ItemKind>("thing");
+  // The fourth route out of the first step, and the only one that adds nothing:
+  // the present is already on the list and just belongs somewhere else on it.
+  const [picking, setPicking] = useState(false);
 
   const result = manual ?? preview.result;
 
@@ -103,12 +119,26 @@ function AddGiftFlow({
   const paste = usePhotoPaste({
     handle,
     listKey,
-    enabled: !result && !fetching,
+    enabled: !result && !fetching && !picking,
     onUploaded: (url) => {
       setKind("thing");
       setManual({ ...EMPTY_MANUAL, images: [url] });
     },
   });
+
+  if (picking && parentId && parentTitle) {
+    return (
+      <MoveIntoIdea
+        handle={handle}
+        listKey={listKey}
+        parentId={parentId}
+        parentTitle={parentTitle}
+        gifts={movable}
+        onDone={onDone}
+        onBack={() => setPicking(false)}
+      />
+    );
+  }
 
   if (fetching) return <Fetching />;
   if (result) {
@@ -188,9 +218,9 @@ function AddGiftFlow({
       </div>
 
       {/* Every route past the scraper is visible from the first second. Inside
-          an idea there is only one of them: cash and a second idea are both
-          things an idea cannot hold, so they are not offered rather than
-          offered and refused. */}
+          an idea there are two: cash and a second idea are both things an idea
+          cannot hold, so they are not offered rather than offered and refused,
+          and in their place is the one route that adds nothing at all. */}
       <div className="flex flex-col gap-2">
         <button
           type="button"
@@ -205,6 +235,26 @@ function AddGiftFlow({
             Title, photo, price, note: no link needed
           </span>
         </button>
+
+        {/* The present is already on the list; it just belongs under the idea.
+            Offered only where there is something to move, so the panel never
+            opens a picker onto an empty list. */}
+        {parentId && movable.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setPicking(true)}
+            className="w-full rounded-control border border-ink-line bg-surface px-[15px] py-[13px] text-left transition-colors duration-150 hover:bg-ink/[.03]"
+          >
+            <span className="block text-sm font-semibold">
+              Move one already on the list
+            </span>
+            <span className="block text-xs text-ink-72">
+              {movable.length === 1
+                ? "One present could go under this idea instead"
+                : `${movable.length} presents could go under this idea instead`}
+            </span>
+          </button>
+        ) : null}
 
         {parentId ? null : (
           <>

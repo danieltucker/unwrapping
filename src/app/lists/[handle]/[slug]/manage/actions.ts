@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { items, lists } from "@/db/schema";
 import { parseClaimRule } from "@/lib/claim-rules";
+import { moveUnderIdea } from "@/lib/item-moves";
 import { requireOwnedList } from "@/lib/list-access";
 import * as routes from "@/lib/routes";
 
@@ -61,6 +62,41 @@ export async function reorderGifts(
   revalidatePath(routes.manageList(list, ownerHandle));
   revalidatePath(routes.publicList(list, ownerHandle));
   return {};
+}
+
+export type MoveGiftState = { ok?: boolean; error?: string };
+
+/**
+ * Puts a present that is already on the list under an idea.
+ *
+ * The other way in is the dropdown in the edit panel, which rides along with
+ * the rest of that form; this one exists for the picker inside "Add a gift to
+ * …", where moving one across *is* the whole action. Both land in
+ * moveUnderIdea, which is where the move is checked rather than trusted.
+ */
+export async function moveGiftToIdea(
+  handle: string,
+  key: string,
+  itemId: string,
+  /** The idea it is going under, or null to take it back to the top level. */
+  parentId: string | null,
+): Promise<MoveGiftState> {
+  const { list, ownerHandle } = await requireOwnedList(handle, key);
+
+  const item = await db
+    .select()
+    .from(items)
+    .where(and(eq(items.id, itemId), eq(items.listId, list.id)))
+    .get();
+
+  if (!item) return { error: "That gift is no longer on the list." };
+
+  const problem = await moveUnderIdea(list.id, item, parentId);
+  if (problem) return { error: problem };
+
+  revalidatePath(routes.manageList(list, ownerHandle));
+  revalidatePath(routes.publicList(list, ownerHandle));
+  return { ok: true };
 }
 
 export type ListDetailsState = { ok?: boolean; error?: string };

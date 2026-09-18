@@ -144,6 +144,59 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   );
 }
 
+/** Two initials from a name: "Daniel Tucker" → "DT". */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((part) => part.charAt(0).toUpperCase()).join("") || "?";
+}
+
+/**
+ * Someone's own photo, or their initials where there isn't one.
+ *
+ * The fallback is the ordinary case rather than the exception: an account needs
+ * a name and an email and nothing else, so most people will never upload
+ * anything, and a circle of initials has to look deliberate rather than like a
+ * picture that failed to load.
+ *
+ * Sized in px because the two callers are far apart — the 32px control in the
+ * header and the 80px one on the profile — and a prop is clearer than two
+ * sets of classes that have to agree about a circle.
+ */
+export function Avatar({
+  name,
+  url,
+  size = 32,
+  className,
+}: {
+  name: string;
+  url: string | null;
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <span
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.36) }}
+      className={cx(
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-pill font-semibold",
+        // Only where there is no photo: an image covers this entirely.
+        // Outside the header those custom properties are not set, so each one
+        // falls back to the product's own violet-on-white.
+        url
+          ? "bg-ink/[.06]"
+          : "bg-[var(--header-accent,var(--color-violet))] text-[var(--header-accent-fg,#fff)]",
+        className,
+      )}
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      ) : (
+        initials(name)
+      )}
+    </span>
+  );
+}
+
 /**
  * The logo: a ribbon still curling after it has been pulled off a present.
  *
@@ -152,7 +205,19 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
  * from the theme rather than from the file, which is why this is drawn inline
  * instead of served as an image.
  */
-export function BrandMark({ size = 24, className }: { size?: number; className?: string }) {
+export function BrandMark({
+  size = 24,
+  className,
+  inverted = false,
+}: {
+  size?: number;
+  className?: string;
+  /**
+   * Swaps the tile and the ribbon, for the violet header bar: a violet tile on
+   * a violet bar is a hole where the mark should be.
+   */
+  inverted?: boolean;
+}) {
   return (
     <svg
       width={size}
@@ -161,11 +226,16 @@ export function BrandMark({ size = 24, className }: { size?: number; className?:
       className={className}
       aria-hidden="true"
     >
-      <rect width="64" height="64" rx="16" className="fill-violet" />
+      <rect
+        width="64"
+        height="64"
+        rx="16"
+        className={inverted ? "fill-paper" : "fill-violet"}
+      />
       <path
         d="M31 33.5a3.5 3.5 0 0 1 3.5-3.5a7 7 0 0 1 7 7a10.5 10.5 0 0 1-10.5 10.5a14 14 0 0 1-14-14a17.5 17.5 0 0 1 17.5-17.5a21 21 0 0 1 19 12"
         fill="none"
-        className="stroke-paper"
+        className={inverted ? "stroke-violet" : "stroke-paper"}
         strokeWidth={6.5}
         strokeLinecap="round"
       />

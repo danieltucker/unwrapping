@@ -64,6 +64,7 @@ export const getCurrentUser = cache(async () => {
       handle: users.handle,
       name: users.name,
       email: users.email,
+      avatarUrl: users.avatarUrl,
       expiresAt: sessions.expiresAt,
     })
     .from(sessions)
@@ -73,8 +74,15 @@ export const getCurrentUser = cache(async () => {
 
   if (!row || row.expiresAt.getTime() < Date.now()) return null;
 
-  // The handle appears in every list URL, so callers routinely need it.
-  return { id: row.id, handle: row.handle, name: row.name, email: row.email };
+  // The handle appears in every list URL, so callers routinely need it, and
+  // the avatar is drawn in the header of every page there is.
+  return {
+    id: row.id,
+    handle: row.handle,
+    name: row.name,
+    email: row.email,
+    avatarUrl: row.avatarUrl,
+  };
 });
 
 export async function destroySession(): Promise<void> {
