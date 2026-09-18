@@ -65,13 +65,28 @@ export async function viewerOwns(resolved: ResolvedList): Promise<boolean> {
  *
  * A viewer who doesn't own it gets a 404 rather than a 403: a wrong guess
  * shouldn't confirm that the list exists.
+ *
+ * For *rendering* a page. Inside a Server Action, prefer `ownedListOrNull`:
+ * `notFound()` throws, and a throw from an action does not render the 404 page
+ * the way it would during a render — it rejects the promise the browser is
+ * waiting on, which takes out the whole screen instead of the one control the
+ * person was using. See uploadPhoto.
  */
 export async function requireOwnedList(
   handle: string,
   key: string,
 ): Promise<ResolvedList> {
-  const resolved = await resolveList(handle, key);
+  const resolved = await ownedListOrNull(handle, key);
   if (!resolved) notFound();
-  if (!(await viewerOwns(resolved))) notFound();
   return resolved;
+}
+
+/** The same check, for callers that need to answer rather than throw. */
+export async function ownedListOrNull(
+  handle: string,
+  key: string,
+): Promise<ResolvedList | null> {
+  const resolved = await resolveList(handle, key);
+  if (!resolved) return null;
+  return (await viewerOwns(resolved)) ? resolved : null;
 }

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
 import { items } from "@/db/schema";
-import { requireOwnedList } from "@/lib/list-access";
+import { ownedListOrNull } from "@/lib/list-access";
 import * as routes from "@/lib/routes";
 import { saveUpload } from "@/lib/uploads";
 
@@ -27,7 +27,21 @@ export async function uploadPhoto(
   const itemId = String(formData.get("itemId") ?? "");
 
   // Uploading writes to disk, so prove ownership before accepting a byte.
-  const { list, ownerHandle } = await requireOwnedList(handle, key);
+  //
+  // Answered rather than thrown. The common way to fail this check is not an
+  // attack but an ordinary expired sign-in on a page that has been open a
+  // while, and `notFound()` here would reject the promise the browser is
+  // waiting on and replace the whole screen with an error — for what is really
+  // "sign in again". A sentence in the dialog, with the page still underneath
+  // it, is the truthful version of that.
+  const owned = await ownedListOrNull(handle, key);
+  if (!owned) {
+    return {
+      error:
+        "We couldn't confirm this list is yours — your sign-in may have run out. Reload the page and try again.",
+    };
+  }
+  const { list, ownerHandle } = owned;
 
   const file = formData.get("photo");
   if (!(file instanceof File)) return { error: "Choose an image first." };

@@ -63,6 +63,7 @@ export function GiftCard({
         emoji={item.emoji}
         fallback="No photo for this one"
         dimmed={settled}
+        href={item.href}
       />
 
       <div className={`h-1 ${band}`} aria-hidden="true" />
@@ -76,7 +77,23 @@ export function GiftCard({
               settled ? "text-ink/62" : ""
             }`}
           >
-            {item.title}
+            {item.href ? (
+              // The one link on the card that carries the gift's name, so it is
+              // the one the photo above defers to. No colour change: the title
+              // is already the loudest thing here, and turning every card's
+              // heading violet would leave nothing for the actions to stand out
+              // against. The underline on hover is what says it is a link.
+              <a
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="hover:underline focus-ring"
+              >
+                {item.title}
+              </a>
+            ) : (
+              item.title
+            )}
           </h3>
           {item.priceCents !== null ? (
             <span

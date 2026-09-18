@@ -32,6 +32,13 @@ console.log(JSON.stringify(result, null, 2));
 const advice: Record<typeof trace.outcome, string> = {
   "no-link":
     "Nothing in that paste parsed as an address. src/lib/scrape-parse.ts:extractUrl decides this.",
+  challenged:
+    "The shop answered, but with an \"are you a robot\" interstitial rather than\n" +
+    "the product. Reading it would mean running the challenge's JavaScript and\n" +
+    "passing its behavioural checks, which is a headless browser's job and not\n" +
+    "something a parser change can reach. This link has to be written in by\n" +
+    "hand, and the form says so. Re-run with SCRAPE_DEBUG=1 to see the page we\n" +
+    "were served, if you want to confirm which vendor it is.",
   blocked:
     "The shop hung up on us before answering. That is bot protection at their\n" +
     "edge, not a bug in the parser: it rejects the connection itself, so no\n" +

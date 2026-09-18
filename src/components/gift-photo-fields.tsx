@@ -104,8 +104,25 @@ export function GiftUploadDialog({
   /** Absent during the add flow, where the gift does not exist yet. */
   itemId?: string;
 } & ListKeys) {
+  // Wrapped rather than passed straight in, because useActionState does not
+  // catch: anything the call itself throws goes to the nearest error boundary
+  // and takes the page with it. That is not a theoretical failure — the request
+  // is a POST to a Server Action identified by an id baked into this build, so
+  // a page left open across a deploy or a dev restart calls an id the server no
+  // longer has and gets a 404 it cannot parse. Losing the list over a failed
+  // photo is the wrong trade; the dialog stays up and says what to do.
   const [state, action, pending] = useActionState<UploadState, FormData>(
-    uploadPhoto,
+    async (previous, formData) => {
+      try {
+        return await uploadPhoto(previous, formData);
+      } catch (error) {
+        console.error("[upload] the action itself failed:", error);
+        return {
+          error:
+            "The upload didn't reach us. If this page has been open a while, reload it and try again.",
+        };
+      }
+    },
     {},
   );
   // Measured here, on the file the picker handed us, rather than left to the

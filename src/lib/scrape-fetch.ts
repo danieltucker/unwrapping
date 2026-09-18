@@ -11,6 +11,8 @@
  * often — they change their markup, or they decide one day that we are a bot —
  * and without that line the only symptom is a gift form that came back empty.
  */
+import { Agent, fetch as undiciFetch } from "undici";
+
 import {
   canonicalizeUrl,
   normalizeUrl,
@@ -36,6 +38,7 @@ export type ScrapeResult = {
  *
  * - `no-link`     nothing in the paste was an address.
  * - `blocked`     the shop hung up on us. Bot protection, almost always.
+ * - `challenged`  it answered 200, but with an "are you a robot" page.
  * - `timeout`     it never answered.
  * - `unreachable` DNS, TLS, or the network.
  * - `http-error`  it answered with a status we can't read a product out of.
@@ -46,6 +49,7 @@ export type ScrapeOutcome =
   | "ok"
   | "no-link"
   | "blocked"
+  | "challenged"
   | "timeout"
   | "unreachable"
   | "http-error"
@@ -85,17 +89,94 @@ const MAX_BYTES = 6_000_000;
 // Some shops serve a different page to anything that looks like a bot, so
 // present as a normal browser. We do NOT impersonate a search-engine crawler
 // to obtain content a site only serves to search engines.
+//
+// A user-agent on its own is no longer enough. A real Chrome navigation also
+// carries client hints (sec-ch-ua*) and fetch metadata (sec-fetch-*), and a
+// shop that checks for them treats their absence as proof of a script: Amazon
+// answers a bare user-agent with a 4KB "continue shopping" stub and the full
+// set with the actual product page. The values below describe the browser we
+// claim to be, consistently — a Chrome user-agent with no client hints is a
+// contradiction, and that mismatch is itself a signal.
+const CHROME_VERSION = "140";
+
 const HEADERS = {
   "user-agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+    `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION}.0.0.0 Safari/537.36`,
   accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
   "accept-language": "en-US,en;q=0.9",
+  "sec-ch-ua": `"Chromium";v="${CHROME_VERSION}", "Not=A?Brand";v="24", "Google Chrome";v="${CHROME_VERSION}"`,
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+  // A typed-in address bar: a top-level navigation, from no prior page.
+  "sec-fetch-dest": "document",
+  "sec-fetch-mode": "navigate",
+  "sec-fetch-site": "none",
+  "sec-fetch-user": "?1",
   "upgrade-insecure-requests": "1",
 };
 
-/** Reads the body but stops at MAX_BYTES rather than buffering a huge page. */
-async function readCapped(response: Response): Promise<string> {
+/**
+ * The cipher list Chrome offers, in Chrome's order.
+ *
+ * Node's TLS defaults are OpenSSL's, and the order a client offers its ciphers
+ * in is a fingerprint: it is most of what JA3 hashes. Shops behind Akamai and
+ * friends compare that fingerprint against the browser the user-agent claims to
+ * be, and a Chrome user-agent arriving on an OpenSSL handshake is a plain
+ * contradiction — which is why headers alone stopped being enough.
+ *
+ * Reordering our own ciphers is not a forged credential and not a defeat of any
+ * access control: it is the same public handshake a browser performs, and every
+ * suite here is one Node already offers. Sites that answer this still answer a
+ * `403` or a challenge when they mean to refuse us, and we honour that below.
+ *
+ * Measured, on the shops this fixed: patagonia.com goes from a 14KB shell with
+ * no product data to the full page; homedepot.com and lowes.com stop refusing
+ * the connection (though they then serve a challenge, which we report).
+ */
+const CHROME_CIPHERS = [
+  "TLS_AES_128_GCM_SHA256",
+  "TLS_AES_256_GCM_SHA384",
+  "TLS_CHACHA20_POLY1305_SHA256",
+  "ECDHE-ECDSA-AES128-GCM-SHA256",
+  "ECDHE-RSA-AES128-GCM-SHA256",
+  "ECDHE-ECDSA-AES256-GCM-SHA384",
+  "ECDHE-RSA-AES256-GCM-SHA384",
+  "ECDHE-ECDSA-CHACHA20-POLY1305",
+  "ECDHE-RSA-CHACHA20-POLY1305",
+  "ECDHE-RSA-AES128-SHA",
+  "ECDHE-RSA-AES256-SHA",
+  "AES128-GCM-SHA256",
+  "AES256-GCM-SHA384",
+  "AES128-SHA",
+  "AES256-SHA",
+].join(":");
+
+/**
+ * One agent for the process, so connections are pooled rather than a fresh
+ * handshake per gift. Node's global `fetch` will not take a dispatcher built
+ * from a different undici than its own, so the fetch used here comes from the
+ * same package as the Agent.
+ */
+const dispatcher = new Agent({
+  connect: {
+    ciphers: CHROME_CIPHERS,
+    honorCipherOrder: true,
+    minVersion: "TLSv1.2",
+    ecdhCurve: "X25519:P-256:P-384",
+  },
+});
+
+/**
+ * Reads the body but stops at MAX_BYTES rather than buffering a huge page.
+ *
+ * Typed by the one thing it uses rather than by `Response`: the response here
+ * comes from undici's fetch (see `dispatcher` above), whose Response type is
+ * structurally the same but nominally distinct from the global one.
+ */
+async function readCapped(response: {
+  body: { getReader(): ReadableStreamDefaultReader<Uint8Array> } | null;
+}): Promise<string> {
   const body = response.body;
   if (!body) return "";
 
@@ -189,6 +270,67 @@ function fromStatus(status: number, host: string): string {
   }
   if (status >= 500) return `${host} is having trouble right now (${status}).`;
   return `The shop returned ${status}.`;
+}
+
+/**
+ * Markers left by the big bot-protection vendors on their "are you a robot"
+ * pages. Each is a script path, element id or incident string belonging to the
+ * vendor's interstitial, not something a shop's own page would carry.
+ */
+const CHALLENGE_MARKERS = [
+  // Akamai Bot Manager. rei.com and bestbuy.com both sit behind this.
+  "sec-if-cpt-container",
+  "_abck",
+  "/akam/",
+  // Cloudflare.
+  "cf-browser-verification",
+  "challenge-platform",
+  "cf_chl_opt",
+  // PerimeterX / HUMAN.
+  "px-captcha",
+  "_pxhd",
+  // Imperva / Incapsula.
+  "_incapsula_resource",
+  "incapsula incident id",
+  // DataDome.
+  "geo.captcha-delivery.com",
+  // Amazon's own. It serves this as a 200 with a plausible <title>, which is
+  // exactly the shape that used to reach the form as a gift called "Amazon.com"
+  // with no price and no picture.
+  "/errors/validatecaptcha",
+  "api-services-support@amazon",
+];
+
+/**
+ * True when a 200 was the shop's bot wall rather than the product.
+ *
+ * Deliberately only asked once the parser has come back empty. Every marker
+ * above could in principle appear on a real page — a shop selling a book about
+ * Cloudflare, say — and a page we *did* read a product out of is a page we
+ * read, whatever else is on it. Checking second means a false positive cannot
+ * cost anyone a scrape that worked; the worst it can do is mislabel a page that
+ * had nothing on it anyway.
+ *
+ * Worth separating from an empty page because the advice differs. A shop that
+ * renders its products in the browser may still be worth adding a parser for; a
+ * challenge page will never be readable without running its JavaScript, and the
+ * honest thing is to say so and let the owner type the gift in.
+ */
+function isChallenge(html: string, parsed: ParsedProduct): boolean {
+  // Anything the parser found in *product* markup means we got the real page.
+  // A <title> or an <h1> does not count: the challenge page has both.
+  const readSomething =
+    parsed.images.length > 0 ||
+    parsed.priceCents !== null ||
+    (parsed.via.title !== null &&
+      parsed.via.title !== "<title>" &&
+      parsed.via.title !== "h1");
+  if (readSomething) return false;
+
+  // The interstitials are small; a big page that merely mentions one of these
+  // is a real page that we happened to read nothing out of.
+  const haystack = html.slice(0, 200_000).toLowerCase();
+  return CHALLENGE_MARKERS.some((marker) => haystack.includes(marker));
 }
 
 const DEBUG = process.env.SCRAPE_DEBUG === "1";
@@ -320,9 +462,10 @@ export async function scrapeProductWithTrace(
   let contentType: string;
 
   try {
-    const response = await fetch(url, {
+    const response = await undiciFetch(url, {
       headers: HEADERS,
       redirect: "follow",
+      dispatcher,
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
@@ -357,17 +500,23 @@ export async function scrapeProductWithTrace(
 
   const parsed = parseProduct(html, finalUrl);
   const canonical = canonicalizeUrl(finalUrl);
+  const challenged = isChallenge(html, parsed);
 
   return done(
-    "ok",
+    challenged ? "challenged" : "ok",
     {
       url: canonical,
       sourceDomain: sourceDomain(canonical),
-      title: parsed.title,
-      priceCents: parsed.priceCents,
-      currency: parsed.currency,
-      images: parsed.images,
-      error: null,
+      // A challenge page has a title ("Access Denied") and sometimes an image,
+      // and putting either on the card would be worse than leaving it blank:
+      // the owner would have to notice the gift is wrong before fixing it.
+      title: challenged ? null : parsed.title,
+      priceCents: challenged ? null : parsed.priceCents,
+      currency: challenged ? null : parsed.currency,
+      images: challenged ? [] : parsed.images,
+      error: challenged
+        ? `${host} asked us to prove we're a person before showing the page. Fill this one in by hand — the link is kept.`
+        : null,
     },
     {
       finalUrl,
