@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { AccountMenu } from "@/components/account-menu";
 import { HeaderBar } from "@/components/header-bar";
+import { isAdminEmail } from "@/lib/admin";
 import { countGuestReservations } from "@/lib/reservations";
 import * as routes from "@/lib/routes";
 import { getCurrentUser } from "@/lib/session";
@@ -85,6 +86,7 @@ async function Identity() {
           reservedCount={reservedCount}
           listsHref={routes.myLists}
           profileHref={routes.profile}
+          adminHref={isAdminEmail(user.email) ? routes.admin : null}
         />
       ) : (
         <>

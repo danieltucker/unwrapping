@@ -12,6 +12,7 @@ export function AccountMenu({
   reservedCount,
   listsHref,
   profileHref,
+  adminHref,
 }: {
   name: string;
   /** Their own photo, or null for the circle of initials. */
@@ -19,6 +20,8 @@ export function AccountMenu({
   reservedCount: number;
   listsHref: string;
   profileHref: string;
+  /** Only set for whoever runs the instance; nobody else is offered the screen. */
+  adminHref?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);
@@ -100,6 +103,19 @@ export function AccountMenu({
           >
             Your profile
           </Link>
+
+          {adminHref ? (
+            /* Separated from the three entries above it: those are this
+               person's own things, and this one is everybody's. */
+            <Link
+              href={adminHref}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="block border-t border-ink-line px-4 py-3 text-sm font-medium hover:bg-ink/[.03]"
+            >
+              Admin
+            </Link>
+          ) : null}
 
           <form action={signOut} className="border-t border-ink-line">
             <button

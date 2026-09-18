@@ -18,7 +18,17 @@ export default async function MyListsPage() {
   const rows = await db
     .select({
       list: lists,
-      giftCount: sql<number>`(select count(*) from ${items} where ${items.listId} = ${lists.id})`,
+      /**
+       * The outer column is written out in full rather than interpolated.
+       *
+       * Drizzle leaves column names unqualified when the query selects from a
+       * single table, which is true of this one — so `${lists.id}` renders as
+       * bare `"id"`, and inside the subquery that resolves against `items`
+       * instead. The comparison then reads `items.list_id = items.id`, which is
+       * never true, and every list reported zero gifts. A join would qualify it,
+       * but there is nothing here to join to.
+       */
+      giftCount: sql<number>`(select count(*) from ${items} where ${items.listId} = "lists"."id")`,
     })
     .from(lists)
     .where(eq(lists.ownerId, user.id))

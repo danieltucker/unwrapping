@@ -1,6 +1,13 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 
 import { formatBytes, uploads } from "@/config/site";
@@ -97,4 +104,80 @@ export async function readUpload(
   } catch {
     return null;
   }
+}
+
+/** One file on disk, as the admin screen lists it. */
+export type StoredUpload = {
+  name: string;
+  /** What a page would reference it by, so callers can match it to a row. */
+  url: string;
+  bytes: number;
+  uploadedAt: Date;
+};
+
+/**
+ * Every photo on disk, newest first.
+ *
+ * The directory *is* the index: nothing records an upload in the database, so
+ * there is no table to read and no chance of the two disagreeing. Files that
+ * don't match the stored-name pattern are skipped rather than listed — anything
+ * else in there was put there by hand, and this screen can delete things.
+ *
+ * Reads the whole directory and stats each entry, which is fine at the scale
+ * this runs at: one household's gift photos, not a media library.
+ */
+export async function listUploads(): Promise<StoredUpload[]> {
+  let names: string[];
+  try {
+    names = await readdir(UPLOAD_DIR);
+  } catch {
+    // Nothing has ever been uploaded, so the directory doesn't exist yet.
+    return [];
+  }
+
+  const found = await Promise.all(
+    names
+      .filter((name) => FILENAME.test(name))
+      .map(async (name) => {
+        try {
+          const info = await stat(path.join(UPLOAD_DIR, name));
+          return {
+            name,
+            url: `/uploads/${name}`,
+            bytes: info.size,
+            // The name is a UUID, so the file's own timestamp is the only
+            // record of when it arrived.
+            uploadedAt: info.mtime,
+          };
+        } catch {
+          // Deleted between the readdir and the stat.
+          return null;
+        }
+      }),
+  );
+
+  return found
+    .filter((upload): upload is StoredUpload => upload !== null)
+    .sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
+}
+
+/**
+ * Removes a photo from disk.
+ *
+ * The name is pattern-checked before it is joined, exactly as in readUpload, so
+ * a crafted name cannot reach out of the upload directory. A file that has
+ * already gone counts as success: the caller wanted it absent, and it is.
+ */
+export async function deleteUpload(name: string): Promise<boolean> {
+  if (!FILENAME.test(name)) return false;
+
+  try {
+    await unlink(path.join(UPLOAD_DIR, name));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+    console.error(`[upload] could not delete ${name}:`, error);
+    return false;
+  }
+
+  return true;
 }
