@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { StartFromLinkForm } from "@/components/start-from-link-form";
 import {
   BoxIcon,
   ButtonLink,
@@ -120,20 +121,30 @@ function Hero() {
           {site.summary}
         </p>
 
-        <div className="mb-[1.125rem] flex flex-wrap items-center gap-3">
-          <ButtonLink href={routes.newList}>
-            Start a list, it&rsquo;s free
-          </ButtonLink>
-          {/* The design pairs the primary with "See an example". There is no
-              demo list to point at yet, so the second button goes to the
-              instructions directly below rather than nowhere. */}
-          <ButtonLink href="#how-it-works" variant="outline">
-            See how it works
-          </ButtonLink>
+        {/* The quickest start there is: the first gift *is* the first step,
+            and the list's name, date and rules wait until there's something
+            on it worth naming. Naming first is still one link away. */}
+        <div className="mb-[1.125rem]">
+          <StartFromLinkForm />
         </div>
 
-        <p className="text-sm text-ink-66">
-          No card needed. Takes about two minutes.
+        <p className="text-sm leading-[1.7] text-ink-66">
+          No account needed to start. Save it when you&rsquo;re ready.{" "}
+          <span className="whitespace-nowrap">
+            <Link
+              href={routes.newList}
+              className="font-semibold text-ink underline-offset-2 hover:underline"
+            >
+              Start with a name instead
+            </Link>
+            {" · "}
+            <Link
+              href="#how-it-works"
+              className="font-semibold text-ink underline-offset-2 hover:underline"
+            >
+              How it works
+            </Link>
+          </span>
         </p>
 
         <dl className="mt-[2.875rem] flex flex-wrap gap-x-[1.875rem] gap-y-5 border-t border-ink-line pt-[1.625rem]">

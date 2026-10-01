@@ -2,6 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import QRCode from "qrcode";
 
 import { AddGiftDialog } from "@/components/add-gift-dialog";
+import { DraftBanner } from "@/components/draft-banner";
 import { GiftRows, type EditorRow } from "@/components/gift-rows";
 import { ListSettings } from "@/components/list-settings";
 import { ShareDialog } from "@/components/share-dialog";
@@ -40,8 +41,13 @@ export async function generateMetadata({
  */
 export default async function EditorPage({
   params,
+  searchParams,
 }: PageProps<"/lists/[handle]/[slug]/manage">) {
   const { handle, slug } = await params;
+  const { started: rawStarted } = await searchParams;
+  // Only the values startFromLink sends; anything else is someone's typo.
+  const started =
+    rawStarted === "link" || rawStarted === "partial" ? rawStarted : null;
   const { list, ownerHandle } = await requireOwnedList(handle, slug);
 
   const [gifts, stats, funding, status] = await Promise.all([
@@ -182,6 +188,12 @@ export default async function EditorPage({
           </AddGiftDialog>
         </div>
       </header>
+
+      <DraftBanner
+        started={started}
+        isDraft={ownerHandle === null}
+        giftCount={gifts.length}
+      />
 
       <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <Stat
