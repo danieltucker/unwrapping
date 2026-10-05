@@ -7,6 +7,7 @@ import {
   PaymentDetailsPanel,
   type PaymentDetails,
 } from "@/components/payment-details-panel";
+import { ReferralDisclosure } from "@/components/referral-disclosure";
 import { ReservationRow } from "@/components/reservation-row";
 import { SavePrompt } from "@/components/save-prompt";
 import { EyeOffIcon } from "@/components/ui";
@@ -129,6 +130,11 @@ Nobody is ever told who reserved or gave what. On a surprise list the owner
               straight back on the list.
             </p>
           </div>
+
+          <ReferralDisclosure
+            hrefs={[...reservations, ...contributions].map((row) => row.href)}
+            className="mb-7 text-ink-62"
+          />
         </>
       )}
 

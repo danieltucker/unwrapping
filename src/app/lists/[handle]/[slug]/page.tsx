@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { GiftGrid } from "@/components/gift-grid";
 import { IdeaList } from "@/components/idea-list";
+import { ReferralDisclosure } from "@/components/referral-disclosure";
 import { EyeOffIcon } from "@/components/ui";
 import { formatPrice, site } from "@/config/site";
 import { getPublicList } from "@/lib/claims";
@@ -129,6 +130,13 @@ export default async function PublicListPage({
             <EyeOffIcon size={17} className="mt-px shrink-0 text-paper/70" />
             <p className="text-xs leading-[1.7] text-paper/84">{promise.footer}</p>
           </div>
+
+          {/* The rail heads the page on phones and stays pinned on desktop,
+              so the disclosure is in view wherever the links are. */}
+          <ReferralDisclosure
+            hrefs={items.map((item) => item.href)}
+            className="text-paper/70"
+          />
         </aside>
 
         <main className="bg-paper px-[22px] py-7 sm:px-7">

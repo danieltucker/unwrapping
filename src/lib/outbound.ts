@@ -1,19 +1,34 @@
 /**
  * Every link that sends a guest to a shop goes through here.
  *
- * Referral/affiliate tagging is planned, so no component should ever render a
+ * Links can carry referral/affiliate tags, so no component should ever render a
  * raw `item.url`. The stored URL stays canonical and untouched; tags are
  * applied at render time, which keeps them recomputable when programmes change.
  */
 
+import { site } from "@/config/site";
 import { sourceDomain } from "@/lib/scrape-parse";
 
 // Re-exported so callers keep importing link helpers from one place.
 export { sourceDomain };
 
-/** Per-retailer referral configuration. Empty until programmes are signed up to. */
-const REFERRAL_TAGS: Record<string, { param: string; value: string }> = {
-  // "amazon.com": { param: "tag", value: "unwrap-20" },
+/**
+ * Per-retailer referral configuration, keyed by `sourceDomain`. Associates tags
+ * are per-marketplace: a "-20" tag only earns on amazon.com, so other Amazon
+ * stores stay untagged until their own programmes are signed up to.
+ *
+ * `disclosure` is the statement the programme requires wherever its tagged
+ * links appear; Amazon's wording is prescribed by the Associates agreement.
+ */
+const REFERRAL_TAGS: Record<
+  string,
+  { param: string; value: string; disclosure: string }
+> = {
+  "amazon.com": {
+    param: "tag",
+    value: "unwrapping0b-20",
+    disclosure: `As an Amazon Associate, ${site.name} earns from qualifying purchases.`,
+  },
 };
 
 export type LinkContext = "web" | "email";
@@ -46,7 +61,20 @@ export function outboundHref(
   return parsed.toString();
 }
 
-/** True once any referral programme is configured; drives the disclosure line. */
-export function hasReferralTags(): boolean {
-  return Object.keys(REFERRAL_TAGS).length > 0;
+/**
+ * The disclosures a page owes for the links on it, one per programme. Empty
+ * when nothing on the page is tagged, so pages without referral links stay
+ * free of the line.
+ */
+export function referralDisclosures(
+  hrefs: Iterable<string | null | undefined>,
+): string[] {
+  const owed = new Set<string>();
+  for (const href of hrefs) {
+    const tag = REFERRAL_TAGS[sourceDomain(href) ?? ""];
+    if (tag && href && new URL(href).searchParams.get(tag.param) === tag.value) {
+      owed.add(tag.disclosure);
+    }
+  }
+  return [...owed];
 }
