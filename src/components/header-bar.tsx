@@ -11,10 +11,11 @@ import { site } from "@/config/site";
  * The bar itself, and the one decision it makes: which way round it is.
  *
  * The rule is that the header is the inverse of the page under it. Nearly every
- * screen is paper, so nearly every screen gets the violet bar. The exception is
- * the guest's view of a list, which opens with the dark rail: putting a third
- * colour above that turns the top of the page into a stack of bands, so there
- * the bar stays paper and the page leads.
+ * screen is paper, so nearly every screen gets the violet bar. The exceptions
+ * open with ink: the guest's view of a list, with its dark rail, and the
+ * homepage, with its hero. Putting a third colour above either turns the top of
+ * the page into a stack of bands, so there the bar stays paper and the page
+ * leads.
  *
  * Client, because the route is the only thing that answers the question and a
  * Server Component cannot read it — that restriction is deliberate in Next, so
@@ -27,7 +28,8 @@ import { site } from "@/config/site";
 type Tone = "paper" | "violet";
 
 /**
- * /lists/<handle>/<slug> exactly: the list as a guest sees it.
+ * Paper over "/" and over /lists/<handle>/<slug> exactly: the list as a guest
+ * sees it.
  *
  * Its /manage and /share screens sit one and two segments deeper and are the
  * owner's own, drawn on paper like the rest of the product, so they are not
@@ -35,6 +37,7 @@ type Tone = "paper" | "violet";
  */
 function toneFor(pathname: string): Tone {
   const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 0) return "paper";
   return segments.length === 3 && segments[0] === "lists" ? "paper" : "violet";
 }
 

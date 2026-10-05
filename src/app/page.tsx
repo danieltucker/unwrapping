@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { StartFromLinkForm } from "@/components/start-from-link-form";
+import { StartFromGiftForm } from "@/components/start-from-gift-form";
 import {
   BoxIcon,
   ButtonLink,
@@ -25,10 +25,10 @@ import * as routes from "@/lib/routes";
  * rather than on an about page: the occasions, what can go on a list, and the
  * questions people ask before trusting a party to a website they don't know.
  *
- * The hero is two full-bleed panels rather than a centred column: the left
- * makes the pitch, the right shows the product keeping its promise. Widths are
- * capped by the content (a 32.5rem headline, a 29rem paragraph) instead of by a
- * page shell, so the ink panel can run to the edge of the window.
+ * The hero is one full-bleed ink banner built around a single input: the
+ * first gift, as a link or just its name. Everything else in it (the pitch,
+ * the stats, the preview of a guest's view) is arranged so the eye lands on
+ * that box first. The header turns paper above it; see HeaderBar.
  */
 
 export const metadata: Metadata = {
@@ -105,49 +105,57 @@ function Section({
 
 function Hero() {
   return (
-    <section className="grid items-stretch lg:grid-cols-[1.06fr_1fr]">
-      <div className="px-[1.375rem] py-14 sm:px-8 lg:px-10 lg:pb-[3.75rem] lg:pt-[4.125rem]">
+    <section className="relative overflow-hidden bg-ink px-[1.375rem] pb-14 pt-14 text-paper sm:px-8 sm:pt-20 lg:px-10 lg:pb-20 lg:pt-24">
+      {/* The only ornament in the design: two hairline circles bleeding off. */}
+      <span
+        className="pointer-events-none absolute -right-[150px] -top-[140px] h-[420px] w-[420px] rounded-pill border border-paper/12"
+        aria-hidden="true"
+      />
+      <span
+        className="pointer-events-none absolute -left-[110px] top-[55%] h-[300px] w-[300px] rounded-pill border border-paper/10"
+        aria-hidden="true"
+      />
+
+      <div className="relative mx-auto max-w-[52rem] text-center">
         {/* Pine dot, because the claim is about availability, not action. */}
-        <p className="mb-[1.625rem] inline-flex items-center gap-2 rounded-pill border border-ink-line-strong px-[13px] py-1.5 text-xs font-medium text-ink-76">
-          <span className="h-1.5 w-1.5 rounded-pill bg-pine" aria-hidden="true" />
+        <p className="mb-[1.625rem] inline-flex items-center gap-2 rounded-pill border border-paper-line px-[13px] py-1.5 text-xs font-medium text-paper-88">
+          <span className="h-1.5 w-1.5 rounded-pill bg-pine-on-ink" aria-hidden="true" />
           Free for lists of any size
         </p>
 
-        <h1 className="mb-[1.375rem] max-w-[32.5rem] font-display text-[2.75rem] leading-[1.02] tracking-[-0.032em] sm:text-[3.875rem]">
+        <h1 className="mx-auto mb-[1.375rem] max-w-[44rem] font-display text-[2.75rem] leading-[1.02] tracking-[-0.032em] text-paper sm:text-[4rem] lg:text-[4.5rem]">
           {site.tagline}
         </h1>
 
-        <p className="mb-[1.875rem] max-w-[29rem] text-base leading-[1.75] text-ink/78">
+        <p className="mx-auto mb-10 max-w-[34rem] text-base leading-[1.75] text-paper-72 sm:text-lg">
           {site.summary}
         </p>
 
         {/* The quickest start there is: the first gift *is* the first step,
             and the list's name, date and rules wait until there's something
-            on it worth naming. Naming first is still one link away. */}
-        <div className="mb-[1.125rem]">
-          <StartFromLinkForm />
-        </div>
+            on it worth naming. Naming the list first is still one link away. */}
+        <StartFromGiftForm />
 
-        <p className="text-sm leading-[1.7] text-ink-66">
+        <p className="mt-6 text-sm leading-[1.7] text-paper-72">
           No account needed to start. Save it when you&rsquo;re ready.{" "}
           <span className="whitespace-nowrap">
             <Link
               href={routes.newList}
-              className="font-semibold text-ink underline-offset-2 hover:underline"
+              className="font-semibold text-paper underline-offset-2 hover:underline"
             >
-              Start with a name instead
+              Or name your list first
             </Link>
             {" · "}
             <Link
               href="#how-it-works"
-              className="font-semibold text-ink underline-offset-2 hover:underline"
+              className="font-semibold text-paper underline-offset-2 hover:underline"
             >
               How it works
             </Link>
           </span>
         </p>
 
-        <dl className="mt-[2.875rem] flex flex-wrap gap-x-[1.875rem] gap-y-5 border-t border-ink-line pt-[1.625rem]">
+        <dl className="mx-auto mt-12 grid max-w-[40rem] grid-cols-3 gap-x-4 border-t border-paper-line pt-8 sm:gap-x-12">
           <Stat figure="2 min" label="to a shareable list" />
           <Stat figure="Any shop" label="links fill themselves in" />
           <Stat figure="Zero" label="spoilers for you" />
@@ -164,8 +172,10 @@ function Stat({ figure, label }: { figure: string; label: string }) {
     <div>
       <dt className="sr-only">{label}</dt>
       <dd>
-        <span className="block font-display text-[1.875rem]">{figure}</span>
-        <span className="mt-0.5 block text-xs font-medium text-ink/68">
+        <span className="block font-display text-[1.5rem] text-paper sm:text-[1.875rem]">
+          {figure}
+        </span>
+        <span className="mt-0.5 block text-xs font-medium text-paper-72">
           {label}
         </span>
       </dd>
@@ -174,24 +184,14 @@ function Stat({ figure, label }: { figure: string; label: string }) {
 }
 
 /**
- * The ink half: a list as a guest would see it, with the promise underneath.
- * Everything here is illustration; it is the only list in the product that
- * nobody owns, so it is written out literally rather than queried.
+ * The foot of the hero: a list as a guest would see it, with the promise
+ * beside it. Everything here is illustration; it is the only list in the
+ * product that nobody owns, so it is written out literally rather than queried.
  */
 function ListPreview() {
   return (
-    <div className="relative flex flex-col justify-center gap-[1.125rem] overflow-hidden bg-ink px-[1.375rem] py-[2.875rem] sm:px-8 lg:px-10">
-      {/* The only ornament in the design: two hairline circles bleeding off. */}
-      <span
-        className="pointer-events-none absolute -right-[150px] -top-[140px] h-[420px] w-[420px] rounded-pill border border-paper/12"
-        aria-hidden="true"
-      />
-      <span
-        className="pointer-events-none absolute -bottom-[120px] -left-[110px] h-[300px] w-[300px] rounded-pill border border-paper/10"
-        aria-hidden="true"
-      />
-
-      <div className="relative mx-auto w-full max-w-[26rem] overflow-hidden rounded-card bg-paper shadow-float">
+    <div className="relative mx-auto mt-14 flex max-w-[52rem] flex-col items-center gap-[1.125rem] lg:flex-row lg:items-center lg:gap-8">
+      <div className="w-full max-w-[26rem] overflow-hidden rounded-card bg-paper text-ink shadow-float">
         <div className="flex items-center gap-2.5 border-b border-ink-line px-4 py-[13px]">
           <span aria-hidden="true">🎂</span>
           <span className="text-sm font-semibold">Maya turns 30</span>
@@ -217,7 +217,7 @@ function ListPreview() {
         </div>
       </div>
 
-      <p className="relative mx-auto flex w-full max-w-[26rem] items-center gap-[11px] rounded-[12px] border border-paper-line bg-paper-fill px-4 py-3.5 text-sm leading-[1.6] text-paper/90">
+      <p className="flex w-full max-w-[26rem] items-center gap-[11px] rounded-[12px] border border-paper-line bg-paper-fill px-4 py-3.5 text-left text-sm leading-[1.6] text-paper/90 lg:flex-1">
         <EyeOffIcon className="shrink-0 text-champagne" />
         <span>
           <strong className="font-semibold text-champagne">

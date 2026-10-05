@@ -4,7 +4,7 @@ import * as routes from "@/lib/routes";
 
 /**
  * The top of the editor, for the two moments an owner needs telling something:
- * they have just landed from the homepage's paste-a-link form, and their list
+ * they have just landed from the homepage's first-gift form, and their list
  * is still an unsaved draft. Either, both, or neither; neither draws nothing.
  *
  * The welcome only lasts while the pasted gift is the only one. After that the
@@ -21,8 +21,11 @@ export function DraftBanner({
   isDraft,
   giftCount,
 }: {
-  /** From ?started=, set by startFromLink. "partial" when the shop half answered. */
-  started: "link" | "partial" | null;
+  /**
+   * From ?started=, set by startFromGift. "partial" when the shop half
+   * answered, "name" when the gift was typed in rather than linked.
+   */
+  started: "link" | "partial" | "name" | null;
   isDraft: boolean;
   giftCount: number;
 }) {
@@ -42,7 +45,9 @@ export function DraftBanner({
             title.
             {started === "partial"
               ? " That shop didn’t tell us everything, so check the title, photo and price on the gift below."
-              : null}
+              : started === "name"
+                ? " Edit the gift below to add a link, a photo or a price, so guests know exactly which one you mean."
+                : null}
           </p>
         </>
       ) : null}

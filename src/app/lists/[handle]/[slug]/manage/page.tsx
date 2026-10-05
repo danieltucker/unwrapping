@@ -45,9 +45,11 @@ export default async function EditorPage({
 }: PageProps<"/lists/[handle]/[slug]/manage">) {
   const { handle, slug } = await params;
   const { started: rawStarted } = await searchParams;
-  // Only the values startFromLink sends; anything else is someone's typo.
+  // Only the values startFromGift sends; anything else is someone's typo.
   const started =
-    rawStarted === "link" || rawStarted === "partial" ? rawStarted : null;
+    rawStarted === "link" || rawStarted === "partial" || rawStarted === "name"
+      ? rawStarted
+      : null;
   const { list, ownerHandle } = await requireOwnedList(handle, slug);
 
   const [gifts, stats, funding, status] = await Promise.all([
