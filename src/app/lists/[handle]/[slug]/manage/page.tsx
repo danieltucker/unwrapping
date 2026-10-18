@@ -4,7 +4,9 @@ import QRCode from "qrcode";
 import { AddGiftDialog } from "@/components/add-gift-dialog";
 import { DraftBanner } from "@/components/draft-banner";
 import { GiftRows, type EditorRow } from "@/components/gift-rows";
+import { ListKindProvider } from "@/components/list-kind";
 import { ListSettings } from "@/components/list-settings";
+import { PublishControl } from "@/components/publish-control";
 import { ShareDialog } from "@/components/share-dialog";
 import { SharePanel } from "@/components/share-panel";
 import { ButtonLink } from "@/components/ui";
@@ -13,6 +15,7 @@ import { db } from "@/db";
 import { items } from "@/db/schema";
 import { getOwnerItemStatus, getOwnerStats } from "@/lib/claims";
 import { fundingForList } from "@/lib/contributions";
+import { allCategories } from "@/lib/guides";
 import {
   formatEventDate,
   formatShortDate,
@@ -38,6 +41,10 @@ export async function generateMetadata({
  * claimed; on a list where the owner has turned surprise off, each row carries
  * its status so they can see what's left to cover. Both are enforced in the
  * data layer; see getPublicList and getOwnerItemStatus.
+ *
+ * A gift guide uses the same editor with the guest half taken out: nothing on
+ * it is claimed or chipped in on, so those numbers and controls are gone, and
+ * in their place is the one decision a guide has — whether it is on /gifts.
  */
 export default async function EditorPage({
   params,
@@ -45,14 +52,20 @@ export default async function EditorPage({
 }: PageProps<"/lists/[handle]/[slug]/manage">) {
   const { handle, slug } = await params;
   const { started: rawStarted } = await searchParams;
-  // Only the values startFromGift sends; anything else is someone's typo.
+  // Only the values startFromGift and copyToList send; anything else is
+  // someone's typo.
   const started =
-    rawStarted === "link" || rawStarted === "partial" || rawStarted === "name"
+    rawStarted === "link" ||
+    rawStarted === "partial" ||
+    rawStarted === "name" ||
+    rawStarted === "copy"
       ? rawStarted
       : null;
   const { list, ownerHandle } = await requireOwnedList(handle, slug);
 
-  const [gifts, stats, funding, status] = await Promise.all([
+  const guide = list.kind === "guide";
+
+  const [gifts, stats, funding, status, categoryRows] = await Promise.all([
     db
       .select()
       .from(items)
@@ -62,7 +75,9 @@ export default async function EditorPage({
     getOwnerStats(list),
     fundingForList(list.id),
     getOwnerItemStatus(list),
+    guide ? allCategories() : Promise.resolve([]),
   ]);
+  const category = categoryRows.find((row) => row.id === list.categoryId) ?? null;
 
   const short = routes.shortLink(list);
   const shareUrl = `${origin}${short ?? routes.publicList(list, ownerHandle)}`;
@@ -120,6 +135,7 @@ export default async function EditorPage({
       ? `${formatPrice(Math.min(...prices))} – ${formatPrice(Math.max(...prices))}`
       : null,
     ownerHandle ? null : "Draft, not saved to an account",
+    guide ? (category ? `${category.emoji} ${category.name}` : "No category yet") : null,
   ].filter(Boolean);
 
   const hasGroupGift = gifts.some((gift) => gift.isGroupGift);
@@ -135,104 +151,152 @@ export default async function EditorPage({
         : "gifts claimed";
 
   return (
-    <main className="mx-auto w-full max-w-[1000px] px-[22px] py-8 sm:px-8">
-      {/* Identity on the left, the three things you do with a list on the
-          right: look at it as a guest, hand it out, add to it. Editing what
-          the list *is* hangs off the title, because that's what it changes. */}
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-        <div className="min-w-0">
-          {eventLine ? (
-            <p className="mb-[9px] text-2xs font-semibold uppercase tracking-[1.6px] text-ink-62">
-              {eventLine}
-            </p>
-          ) : null}
-          <div className="mb-[9px] flex items-center gap-[10px]">
-            <h1 className="font-display text-[2.5rem] leading-[1.05] tracking-[-1.2px]">
-              <span className="mr-3">{list.emoji}</span>
-              {list.name}
-            </h1>
-            <ListSettings
-              handle={handle}
-              listKey={slug}
-              details={{
-                name: list.name,
-                emoji: list.emoji,
-                eventDate: toDateInput(list.eventDate),
-                note: list.note ?? "",
-                claimRule: list.claimRule,
-                surpriseMode: list.surpriseMode,
-                deliveryAddress: list.deliveryAddress ?? "",
-                paymentDetails: list.paymentDetails ?? "",
-              }}
-            />
-          </div>
-          <p className="text-sm font-medium text-ink-72">
-            {meta.join(" · ")}
-            {list.sharedAt ? (
-              <span className="text-pine-dark">
-                <span className="px-2 opacity-40">·</span>
-                <span aria-hidden="true">● </span>
-                Live since {formatShortDate(list.sharedAt)}
-              </span>
+    <ListKindProvider guide={guide}>
+      <main className="mx-auto w-full max-w-[1000px] px-[22px] py-8 sm:px-8">
+        {/* Identity on the left, the three things you do with a list on the
+            right: look at it as a guest, hand it out, add to it. Editing what
+            the list *is* hangs off the title, because that's what it changes. */}
+        <header className="mb-5 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+          <div className="min-w-0">
+            {eventLine ? (
+              <p className="mb-[9px] text-2xs font-semibold uppercase tracking-[1.6px] text-ink-62">
+                {eventLine}
+              </p>
             ) : null}
-          </p>
-        </div>
+            <div className="mb-[9px] flex items-center gap-[10px]">
+              <h1 className="font-display text-[2.5rem] leading-[1.05] tracking-[-1.2px]">
+                <span className="mr-3">{list.emoji}</span>
+                {list.name}
+              </h1>
+              <ListSettings
+                handle={handle}
+                listKey={slug}
+                details={{
+                  name: list.name,
+                  emoji: list.emoji,
+                  eventDate: toDateInput(list.eventDate),
+                  note: list.note ?? "",
+                  claimRule: list.claimRule,
+                  surpriseMode: list.surpriseMode,
+                  allowCopying: list.allowCopying,
+                  deliveryAddress: list.deliveryAddress ?? "",
+                  paymentDetails: list.paymentDetails ?? "",
+                  guide: guide
+                    ? {
+                        categoryId: list.categoryId ?? "",
+                        categories: categoryRows.map(({ id, name, emoji }) => ({
+                          id,
+                          name,
+                          emoji,
+                        })),
+                      }
+                    : undefined,
+                }}
+              />
+            </div>
+            <p className="text-sm font-medium text-ink-72">
+              {meta.join(" · ")}
+              {guide ? (
+                list.publishedAt ? (
+                  <span className="text-pine-dark">
+                    <span className="px-2 opacity-40">·</span>
+                    <span aria-hidden="true">● </span>
+                    On Gift lists since {formatShortDate(list.publishedAt)}
+                  </span>
+                ) : (
+                  <span className="text-amber-dark">
+                    <span className="px-2 opacity-40">·</span>
+                    Not published yet
+                  </span>
+                )
+              ) : list.sharedAt ? (
+                <span className="text-pine-dark">
+                  <span className="px-2 opacity-40">·</span>
+                  <span aria-hidden="true">● </span>
+                  Live since {formatShortDate(list.sharedAt)}
+                </span>
+              ) : null}
+            </p>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-[10px]">
-          <ButtonLink href={routes.publicList(list, ownerHandle)} variant="outline">
-            Preview
-          </ButtonLink>
-          <ShareDialog>
-            <SharePanel shareUrl={shareUrl} canonical={canonical} qrSvg={qrSvg} />
-          </ShareDialog>
-          <AddGiftDialog handle={handle} listKey={slug}>
-            + Add gift
-          </AddGiftDialog>
-        </div>
-      </header>
+          <div className="flex flex-wrap items-center gap-[10px]">
+            <ButtonLink href={routes.publicList(list, ownerHandle)} variant="outline">
+              Preview
+            </ButtonLink>
+            <ShareDialog>
+              <SharePanel shareUrl={shareUrl} canonical={canonical} qrSvg={qrSvg} />
+            </ShareDialog>
+            <AddGiftDialog handle={handle} listKey={slug}>
+              + Add gift
+            </AddGiftDialog>
+            {guide ? (
+              <PublishControl
+                handle={handle}
+                listKey={slug}
+                published={list.publishedAt !== null}
+              />
+            ) : null}
+          </div>
+        </header>
 
-      <DraftBanner
-        started={started}
-        isDraft={ownerHandle === null}
-        giftCount={gifts.length}
-      />
-
-      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        <Stat
-          figure={String(stats.linkOpens)}
-          label={
-            stats.linkOpens === 1
-              ? "person opened your link"
-              : "people opened your link"
-          }
+        <DraftBanner
+          started={started}
+          isDraft={ownerHandle === null}
+          giftCount={gifts.length}
         />
-        <Stat figure={String(stats.claimedCount)} label={claimedLabel} tone="pine" />
-        {hasGroupGift ? (
-          <Stat
-            figure={formatPrice(stats.raisedCents)}
-            label="chipped in toward group gifts"
-            tone="rose"
-          />
-        ) : null}
-      </div>
 
-      {rows.length === 0 ? (
-        <AddGiftDialog
-          handle={handle}
-          listKey={slug}
-          className="block w-full rounded-[12px] border border-dashed border-ink-line-strong px-6 py-12 text-center transition-colors duration-150 hover:bg-ink/[.02]"
-        >
-          <span className="mb-2 block text-base font-semibold">
-            Nothing on the list yet
-          </span>
-          <span className="block text-sm leading-[1.7] text-ink-72">
-            Paste a link from any shop and we&rsquo;ll fill in the rest.
-          </span>
-        </AddGiftDialog>
-      ) : (
-        <GiftRows rows={rows} handle={handle} listKey={slug} />
-      )}
-    </main>
+        <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <Stat
+            figure={String(stats.linkOpens)}
+            label={
+              stats.linkOpens === 1
+                ? "person opened your link"
+                : "people opened your link"
+            }
+          />
+          {guide ? null : (
+            <Stat figure={String(stats.claimedCount)} label={claimedLabel} tone="pine" />
+          )}
+          {hasGroupGift && !guide ? (
+            <Stat
+              figure={formatPrice(stats.raisedCents)}
+              label="chipped in toward group gifts"
+              tone="rose"
+            />
+          ) : null}
+          {/* On a wishlist, only once it has happened: "0 people copied this"
+              reads as a verdict on the list rather than a fact about it. On a
+              guide, being copied is the point, so the count is always there. */}
+          {stats.copyCount > 0 || guide ? (
+            <Stat
+              figure={String(stats.copyCount)}
+              label={
+                stats.copyCount === 1
+                  ? "person copied this list to start their own"
+                  : "people copied this list to start their own"
+              }
+            />
+          ) : null}
+        </div>
+
+        {rows.length === 0 ? (
+          <AddGiftDialog
+            handle={handle}
+            listKey={slug}
+            className="block w-full rounded-[12px] border border-dashed border-ink-line-strong px-6 py-12 text-center transition-colors duration-150 hover:bg-ink/[.02]"
+          >
+            <span className="mb-2 block text-base font-semibold">
+              Nothing on the list yet
+            </span>
+            <span className="block text-sm leading-[1.7] text-ink-72">
+              Paste a link from any shop and we&rsquo;ll fill in the rest.
+            </span>
+          </AddGiftDialog>
+        ) : (
+          <GiftRows rows={rows} handle={handle} listKey={slug} />
+        )}
+      </main>
+    </ListKindProvider>
   );
 }
 

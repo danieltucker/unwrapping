@@ -7,7 +7,9 @@ import {
   type ListDetailsState,
 } from "@/app/lists/[handle]/[slug]/manage/actions";
 import {
+  CategoryField,
   ClaimRuleFields,
+  CopyingChoice,
   DeliveryAddressField,
   PaymentDetailsField,
   ListIdentityFields,
@@ -25,8 +27,11 @@ export type ListDetails = {
   note: string;
   claimRule: ClaimRule;
   surpriseMode: boolean;
+  allowCopying: boolean;
   deliveryAddress: string;
   paymentDetails: string;
+  /** Set on a gift guide, which swaps every rule above for a category. */
+  guide?: { categoryId: string; categories: { id: string; name: string; emoji: string }[] };
 };
 
 export function ListSettings({
@@ -73,11 +78,12 @@ export function ListSettings({
             id="list-details-heading"
             className="mb-1 font-display text-[1.75rem] leading-[1.1] tracking-[-.7px]"
           >
-            List details
+            {details.guide ? "Gift list details" : "List details"}
           </h2>
           <p className="mb-6 text-sm leading-[1.65] text-ink-76">
-            Rename it, move the date, change who can claim. The share link stays
-            the same, so anything already sent still works.
+            {details.guide
+              ? "Rename it, say who it's for, or move it to another shelf. The link stays the same."
+              : "Rename it, move the date, change who can claim. The share link stays the same, so anything already sent still works."}
           </p>
 
           <ListIdentityFields
@@ -85,11 +91,23 @@ export function ListSettings({
             defaultEmoji={details.emoji}
             defaultEventDate={details.eventDate}
             defaultNote={details.note}
+            guide={Boolean(details.guide)}
           />
-          <DeliveryAddressField defaultValue={details.deliveryAddress} />
-          <PaymentDetailsField defaultValue={details.paymentDetails} />
-          <ClaimRuleFields value={details.claimRule} />
-          <SurpriseChoice defaultOn={details.surpriseMode} />
+          {details.guide ? (
+            // Always copyable: being copied from is what a guide is for.
+            <CategoryField
+              categories={details.guide.categories}
+              defaultValue={details.guide.categoryId}
+            />
+          ) : (
+            <>
+              <DeliveryAddressField defaultValue={details.deliveryAddress} />
+              <PaymentDetailsField defaultValue={details.paymentDetails} />
+              <ClaimRuleFields value={details.claimRule} />
+              <SurpriseChoice defaultOn={details.surpriseMode} />
+              <CopyingChoice defaultOn={details.allowCopying} />
+            </>
+          )}
 
           {state.error ? (
             <p

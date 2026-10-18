@@ -64,10 +64,15 @@ export async function updateItem(
     return { error: "That price didn't look like a number." };
   }
 
-  const quantity = Math.min(
-    Math.max(Number.parseInt(String(formData.get("quantity") ?? "1"), 10) || 1, 1),
-    20,
-  );
+  // On a guide nothing is bought for one person: no units, no chipping in.
+  // See addGift.
+  const guide = owned.list.kind === "guide";
+  const quantity = guide
+    ? 1
+    : Math.min(
+        Math.max(Number.parseInt(String(formData.get("quantity") ?? "1"), 10) || 1, 1),
+        20,
+      );
 
   const selectedImageIndex = Math.min(
     Math.max(
@@ -85,7 +90,7 @@ export async function updateItem(
   // split and so never becomes one.
   const isGroupGift =
     item.kind === "cash" ||
-    (item.kind === "thing" && formData.get("isGroupGift") === "on");
+    (item.kind === "thing" && !guide && formData.get("isGroupGift") === "on");
   const rawGoal = String(formData.get("goal") ?? "").trim();
   const parsedGoal = rawGoal ? parsePriceToCents(rawGoal) : null;
   if (isGroupGift && rawGoal && parsedGoal === null) {

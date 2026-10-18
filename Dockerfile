@@ -62,9 +62,10 @@ VOLUME ["/app/data"]
 USER nextjs
 EXPOSE 3000
 
-# robots.txt is served from memory and touches neither the database nor a
-# session, so it answers even while the disk is busy.
+# The web manifest is built from config alone and touches neither the database
+# nor a session, so it answers even while the disk is busy. (robots.txt used to
+# be the probe, but it now lists published gift guides, which means a query.)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/robots.txt').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/manifest.webmanifest').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "server.js"]

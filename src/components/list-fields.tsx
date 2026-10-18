@@ -27,6 +27,7 @@ export function ListIdentityFields({
   defaultNote = "",
   minDate,
   autoFocus = false,
+  guide = false,
 }: {
   defaultName?: string;
   defaultEmoji?: string;
@@ -35,6 +36,11 @@ export function ListIdentityFields({
   /** Set on a new list, where the event can only be ahead of us. */
   minDate?: string;
   autoFocus?: boolean;
+  /**
+   * A gift guide is for nobody in particular, so it has no event to date and
+   * its note is a description for strangers rather than a word to guests.
+   */
+  guide?: boolean;
 }) {
   const [name, setName] = useState(defaultName);
   const [debouncedName, setDebouncedName] = useState(defaultName);
@@ -63,7 +69,7 @@ export function ListIdentityFields({
     <>
       <input type="hidden" name="emoji" value={emoji} />
 
-      <div className="mb-3 grid gap-[14px] sm:grid-cols-[1.7fr_1fr]">
+      <div className={`mb-3 grid gap-[14px] ${guide ? "" : "sm:grid-cols-[1.7fr_1fr]"}`}>
         <div>
           <label htmlFor="name">
             <CapsLabel className="mb-[7px]">List name</CapsLabel>
@@ -86,7 +92,7 @@ export function ListIdentityFields({
               name="name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Maya turns 30"
+              placeholder={guide ? "For the PC gamer" : "Maya turns 30"}
               required
               maxLength={80}
               autoFocus={autoFocus}
@@ -95,18 +101,20 @@ export function ListIdentityFields({
           </div>
         </div>
 
-        <div>
-          <label htmlFor="eventDate">
-            <CapsLabel className="mb-[7px]">Event date</CapsLabel>
-          </label>
-          <Input
-            id="eventDate"
-            name="eventDate"
-            type="date"
-            min={minDate}
-            defaultValue={defaultEventDate}
-          />
-        </div>
+        {guide ? null : (
+          <div>
+            <label htmlFor="eventDate">
+              <CapsLabel className="mb-[7px]">Event date</CapsLabel>
+            </label>
+            <Input
+              id="eventDate"
+              name="eventDate"
+              type="date"
+              min={minDate}
+              defaultValue={defaultEventDate}
+            />
+          </div>
+        )}
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-[10px]">
@@ -143,7 +151,7 @@ export function ListIdentityFields({
       <div className="mb-6">
         <label htmlFor="note">
           <CapsLabel className="mb-[7px]">
-            Note to guests{" "}
+            {guide ? "Who it's for" : "Note to guests"}{" "}
             <span className="font-normal normal-case tracking-normal text-ink-62">
               (optional)
             </span>
@@ -155,7 +163,11 @@ export function ListIdentityFields({
           rows={2}
           maxLength={400}
           defaultValue={defaultNote}
-          placeholder="No pressure at all, but if you're the gift-giving type, here's what I'd actually use."
+          placeholder={
+            guide
+              ? "Upgrades for someone who builds their own rig and plays late. Nothing they'll already have three of."
+              : "No pressure at all, but if you're the gift-giving type, here's what I'd actually use."
+          }
         />
       </div>
     </>
@@ -226,6 +238,76 @@ export function SurpriseChoice({ defaultOn = true }: { defaultOn?: boolean }) {
         <input
           type="checkbox"
           name="surpriseMode"
+          checked={on}
+          onChange={(event) => setOn(event.target.checked)}
+          className="mt-[3px] h-4 w-4 shrink-0 accent-violet"
+        />
+      </label>
+    </div>
+  );
+}
+
+/**
+ * The shelf a gift guide sits on in /gifts. Optional while it's being written,
+ * and needed before it can be published, which is what the line under it says.
+ */
+export function CategoryField({
+  categories,
+  defaultValue = "",
+}: {
+  categories: { id: string; name: string; emoji: string }[];
+  defaultValue?: string;
+}) {
+  return (
+    <div className="mb-6">
+      <label htmlFor="categoryId">
+        <CapsLabel className="mb-[7px]">Category</CapsLabel>
+      </label>
+      <select
+        id="categoryId"
+        name="categoryId"
+        defaultValue={defaultValue}
+        className="w-full rounded-control border border-ink-line-strong bg-surface px-[14px] py-3 text-sm font-medium text-ink focus-ring"
+      >
+        <option value="">Choose one later</option>
+        {categories.map((category) => (
+          <option key={category.id} value={category.id}>
+            {category.emoji} {category.name}
+          </option>
+        ))}
+      </select>
+      <p className="mt-[7px] text-xs leading-[1.55] text-ink-72">
+        Where people browsing gift lists will find it. You can publish once it
+        has a category and something on it.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Whether other people may copy this list's gifts into lists of their own.
+ *
+ * Only the gifts travel — never who reserved what, never the owner's notes —
+ * so the line under the switch says exactly that, because "copy my list" sounds
+ * like more than it is.
+ */
+export function CopyingChoice({ defaultOn = true }: { defaultOn?: boolean }) {
+  const [on, setOn] = useState(defaultOn);
+
+  return (
+    <div className="mb-6 rounded-[12px] border border-ink-line bg-surface px-4 py-[13px]">
+      <label className="flex cursor-pointer items-start gap-3">
+        <span className="flex-1">
+          <span className="block text-sm font-semibold">Let people copy it</span>
+          <span className="block text-xs leading-[1.55] text-ink-72">
+            {on
+              ? "Anyone with the link can copy your gifts onto a list of their own. They get the links, photos and prices, never your notes or who reserved what."
+              : "Only you can copy this list. Nobody else sees the option."}
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          name="allowCopying"
           checked={on}
           onChange={(event) => setOn(event.target.checked)}
           className="mt-[3px] h-4 w-4 shrink-0 accent-violet"

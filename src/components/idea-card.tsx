@@ -1,4 +1,5 @@
 import { CardPhoto } from "@/components/card-photo";
+import { CopyItemButton } from "@/components/copy-dialog";
 import { BoughtButton, ReleaseButton, ReserveDialog } from "@/components/reserve-dialog";
 import { formatPrice } from "@/config/site";
 import type { ClaimRule } from "@/db/schema";
@@ -93,6 +94,13 @@ export function IdeaCard({
           viewerIsOwner={viewerIsOwner}
           signedIn={signedIn}
           surpriseMode={surpriseMode}
+        />
+
+        {/* Takes the presents listed under it as well; see pickRows. */}
+        <CopyItemButton
+          itemId={item.id}
+          title={item.title}
+          label="+ Add this idea to my list"
         />
       </div>
     </li>

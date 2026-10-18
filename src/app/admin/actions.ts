@@ -1,17 +1,18 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
-import { items, lists, users } from "@/db/schema";
+import { categories, items, lists, users } from "@/db/schema";
 import { adminOrNull } from "@/lib/admin";
 import * as routes from "@/lib/routes";
+import { slugify } from "@/lib/slug";
 import { deleteUpload } from "@/lib/uploads";
 
 /**
- * The three things the operator's screen can remove: an account, a list, and a
- * photo on disk.
+ * The three things the operator's screen can remove — an account, a list, and a
+ * photo on disk — and the one thing it curates: the categories on /gifts.
  *
  * Every one of them re-checks who is asking. A Server Action is reachable by a
  * POST from anywhere, not only from the page that renders the button, so the
@@ -185,3 +186,91 @@ export async function deleteImage(
   return { ok: true, message: "Deleted that photo." };
 }
 
+
+/** Sub-paths of /gifts that a category slug must not shadow. */
+const RESERVED_CATEGORY_SLUGS = new Set(["new"]);
+
+/**
+ * Creates a category on /gifts, or edits one when an id is posted.
+ *
+ * The slug is the category's URL, so it is kept when the name changes unless
+ * the operator types a new one; links to /gifts/outdoors in the wild should
+ * not break because "Outdoors" became "The great outdoors".
+ */
+export async function saveCategory(
+  _previous: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const admin = await adminOrNull();
+  if (!admin) return { error: NOT_ADMIN };
+
+  const id = String(formData.get("id") ?? "") || null;
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "A category needs a name." };
+  if (name.length > 40) return { error: "That name is a little long for a shelf." };
+
+  const description = String(formData.get("description") ?? "").trim();
+  if (description.length > 300) return { error: "Keep the description under 300 characters." };
+
+  // An emoji can be several code points; anything longer isn't one.
+  const emoji = String(formData.get("emoji") ?? "").trim().slice(0, 8) || "🎁";
+
+  const typedSlug = String(formData.get("slug") ?? "").trim();
+  const existing = id
+    ? await db.select().from(categories).where(eq(categories.id, id)).get()
+    : null;
+  if (id && !existing) return { error: "That category is already gone." };
+
+  const slug = typedSlug ? slugify(typedSlug) : (existing?.slug ?? slugify(name));
+  if (RESERVED_CATEGORY_SLUGS.has(slug)) {
+    return { error: `/gifts/${slug} is taken by the site itself. Pick another slug.` };
+  }
+
+  const clash = await db
+    .select({ name: categories.name })
+    .from(categories)
+    .where(id ? and(eq(categories.slug, slug), ne(categories.id, id)) : eq(categories.slug, slug))
+    .get();
+  if (clash) return { error: `“${clash.name}” already uses /gifts/${slug}.` };
+
+  if (existing) {
+    await db
+      .update(categories)
+      .set({ name, slug, description, emoji })
+      .where(eq(categories.id, existing.id));
+  } else {
+    await db.insert(categories).values({ name, slug, description, emoji });
+  }
+
+  revalidatePath(routes.admin);
+  revalidatePath(routes.giftGuides, "layout");
+  revalidatePath("/");
+  return { ok: true, message: existing ? `Saved “${name}”.` : `Added “${name}”.` };
+}
+
+/**
+ * Removes a category. The guides on it are kept — they belong to the people
+ * who wrote them — and drop to "More gift lists" on /gifts until their owners
+ * pick another shelf.
+ */
+export async function deleteCategory(
+  _previous: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const admin = await adminOrNull();
+  if (!admin) return { error: NOT_ADMIN };
+
+  const id = String(formData.get("categoryId") ?? "");
+  const category = id
+    ? await db.select().from(categories).where(eq(categories.id, id)).get()
+    : null;
+  if (!category) return { error: "That category is already gone." };
+
+  // lists.categoryId is `set null`, so the guides on it simply lose their shelf.
+  await db.delete(categories).where(eq(categories.id, id));
+
+  revalidatePath(routes.admin);
+  revalidatePath(routes.giftGuides, "layout");
+  revalidatePath("/");
+  return { ok: true, message: `Deleted “${category.name}”.` };
+}

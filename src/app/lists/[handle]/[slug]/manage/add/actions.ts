@@ -81,6 +81,14 @@ export async function addGift(
   const kind: ItemKind =
     posted === "cash" ? "cash" : posted === "idea" ? "idea" : "thing";
 
+  // A guide is for nobody in particular: there is nobody to send money to, no
+  // units to run out of, and nobody to chip in for. The form doesn't offer any
+  // of it; this is the part that holds whatever is posted.
+  const guide = list.kind === "guide";
+  if (guide && kind === "cash") {
+    return { error: "A gift list for anyone can't ask for money." };
+  }
+
   // Neither money nor an idea points at a product page.
   const url =
     kind === "thing" ? String(formData.get("url") ?? "").trim() || null : null;
@@ -95,7 +103,7 @@ export async function addGift(
 
   // Money has no quantity, and an idea has no units to run out of.
   const quantity =
-    kind === "thing"
+    kind === "thing" && !guide
       ? Math.min(
           Math.max(
             Number.parseInt(String(formData.get("quantity") ?? "1"), 10) || 1,
@@ -143,7 +151,8 @@ export async function addGift(
   // Cash is always open to chipping in; there is nothing else to do with it.
   // An idea has no price to split, so it is never one.
   const isGroupGift =
-    kind === "cash" || (kind === "thing" && formData.get("isGroupGift") === "on");
+    kind === "cash" ||
+    (kind === "thing" && !guide && formData.get("isGroupGift") === "on");
   const rawGoal = String(formData.get("goal") ?? "").trim();
   const parsedGoal = rawGoal ? parsePriceToCents(rawGoal) : null;
   if (isGroupGift && rawGoal && parsedGoal === null) {

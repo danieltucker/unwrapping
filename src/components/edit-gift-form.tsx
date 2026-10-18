@@ -15,6 +15,7 @@ import {
   usePhotoPaste,
 } from "@/components/gift-photo-fields";
 import { GoalField } from "@/components/goal-field";
+import { useIsGuide } from "@/components/list-kind";
 import { IdeaField, type IdeaOption } from "@/components/move-into-idea";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
 import { centsToInput } from "@/config/site";
@@ -62,6 +63,8 @@ export function EditGiftForm({
   // Kind is fixed once the gift exists, so this only decides what is shown.
   const cash = item.kind === "cash";
   const idea = item.kind === "idea";
+  // See ConfirmGift in add-gift-form: a guide has no units and no chipping in.
+  const guide = useIsGuide();
 
   // After an upload the server selects the new photo; follow it so the
   // preview shows what was just added rather than the old choice.
@@ -126,20 +129,22 @@ export function EditGiftForm({
                     className="py-[9px] text-sm"
                   />
                 </div>
-                <div className="w-[72px] shrink-0">
-                  <label htmlFor="quantity">
-                    <CapsLabel className="mb-[5px] text-2xs">Qty</CapsLabel>
-                  </label>
-                  <Input
-                    id="quantity"
-                    name="quantity"
-                    type="number"
-                    min={1}
-                    max={20}
-                    defaultValue={item.quantity}
-                    className="py-[9px] text-sm"
-                  />
-                </div>
+                {guide ? null : (
+                  <div className="w-[72px] shrink-0">
+                    <label htmlFor="quantity">
+                      <CapsLabel className="mb-[5px] text-2xs">Qty</CapsLabel>
+                    </label>
+                    <Input
+                      id="quantity"
+                      name="quantity"
+                      type="number"
+                      min={1}
+                      max={20}
+                      defaultValue={item.quantity}
+                      className="py-[9px] text-sm"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -150,7 +155,13 @@ export function EditGiftForm({
         <div className="mb-4">
           <label htmlFor="reason">
             <CapsLabel className="mb-[5px] text-2xs">
-              {cash ? "What it's for" : idea ? "What to look for" : "Why you want it"}
+              {cash
+                ? "What it's for"
+                : idea
+                  ? "What to look for"
+                  : guide
+                    ? "Why it's a good pick"
+                    : "Why you want it"}
             </CapsLabel>
           </label>
           <Textarea
@@ -172,7 +183,9 @@ export function EditGiftForm({
 
         <div className="mb-5 flex flex-col gap-2">
           <label className="flex cursor-pointer items-center justify-between rounded-control border border-ink-line bg-surface px-[13px] py-[11px]">
-            <span className="text-sm font-semibold">Mark as most wanted</span>
+            <span className="text-sm font-semibold">
+              {guide ? "Mark as a top pick" : "Mark as most wanted"}
+            </span>
             <input
               type="checkbox"
               name="isMostWanted"
@@ -180,7 +193,7 @@ export function EditGiftForm({
               className="h-4 w-4 accent-violet"
             />
           </label>
-          {cash || idea ? null : (
+          {cash || idea || guide ? null : (
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-control border border-ink-line bg-surface px-[13px] py-[11px]">
               <span>
                 <span className="block text-sm font-semibold">

@@ -65,6 +65,17 @@ async function Identity() {
 
   return (
     <div className="flex items-center gap-2 sm:gap-3">
+      {/* The one place to browse rather than build, so it is offered to
+          everyone, signed in or not. Hidden on the narrowest phones, where
+          the cluster has room for identity and nothing else; the homepage
+          links to it from the hero instead. */}
+      <Link
+        href={routes.giftGuides}
+        className="hidden min-h-11 items-center px-2 text-xs font-semibold text-(--header-muted) -my-2 hover:text-(--header-fg) min-[400px]:inline-flex sm:min-h-0 sm:my-0"
+      >
+        Gift lists
+      </Link>
+
       {/* A guest with reservations gets a real control, not a line of prose. */}
       {reservedCount > 0 && !user ? (
         <Link

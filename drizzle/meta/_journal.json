@@ -57,6 +57,20 @@
       "when": 1789766459246,
       "tag": "0007_ambiguous_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792343687855,
+      "tag": "0008_flashy_supreme_intelligence",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792346436174,
+      "tag": "0009_complete_stephen_strange",
+      "breakpoints": true
     }
   ]
 }

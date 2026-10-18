@@ -3,12 +3,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { deleteAccount, deleteImage, deleteList } from "@/app/admin/actions";
+import {
+  deleteAccount,
+  deleteCategory,
+  deleteImage,
+  deleteList,
+} from "@/app/admin/actions";
 import { AdminDelete } from "@/components/admin-delete";
+import { CategoryForm, CategoryRow } from "@/components/category-form";
 import { Avatar, CapsLabel } from "@/components/ui";
 import { db } from "@/db";
 import { items, lists, users } from "@/db/schema";
 import { requireAdmin } from "@/lib/admin";
+import { allCategories } from "@/lib/guides";
 import { displayHost } from "@/lib/origin";
 import * as routes from "@/lib/routes";
 import { listUploads } from "@/lib/uploads";
@@ -22,7 +29,8 @@ export const metadata: Metadata = {
 
 /**
  * Everything on this instance, and the three ways to remove some of it:
- * accounts, lists, and the photos on disk.
+ * accounts, lists, and the photos on disk. Above them, the one thing here that
+ * is curated rather than cleaned up: the categories gift guides are filed under.
  *
  * Reachable only by whoever the operator named in ADMIN_EMAILS — see
  * `src/lib/admin.ts` for why that is an environment variable rather than a
@@ -37,7 +45,9 @@ export const metadata: Metadata = {
 export default async function AdminPage() {
   await requireAdmin();
 
-  const [accounts, allLists, uploads, photoOwners, avatarOwners] = await Promise.all([
+  const [categoryRows, accounts, allLists, uploads, photoOwners, avatarOwners] = await Promise.all([
+    allCategories(),
+
     db.select().from(users).orderBy(desc(users.createdAt)).all(),
 
     // Left-joined rather than inner: a list with no owner is an unclaimed
@@ -117,6 +127,29 @@ export default async function AdminPage() {
       </p>
 
       <Section
+        title="Gift list categories"
+        count={categoryRows.length}
+        note="Shown on /gifts and the homepage"
+        empty="No categories yet. Add the first above, and gift lists can be filed under it."
+        before={<CategoryForm />}
+      >
+        {categoryRows.map(({ guideCount, ...category }) => (
+          <CategoryRow key={category.id} category={category} guideCount={guideCount}>
+            <AdminDelete
+              action={deleteCategory}
+              fields={{ categoryId: category.id }}
+              label="Delete"
+              prompt={
+                guideCount > 0
+                  ? `Delete “${category.name}”? Its ${plural(guideCount, "gift list")} stay published, without a category, until their owners pick another.`
+                  : `Delete “${category.name}”? Nothing is filed under it.`
+              }
+            />
+          </CategoryRow>
+        ))}
+      </Section>
+
+      <Section
         title="Accounts"
         count={accounts.length}
         empty="Nobody has signed up yet."
@@ -166,7 +199,14 @@ export default async function AdminPage() {
               <span className="text-xl leading-none">{list.emoji}</span>
 
               <div className="min-w-0 flex-1">
-                <p className="truncate text-base font-semibold">{list.name}</p>
+                <p className="truncate text-base font-semibold">
+                  {list.name}
+                  {list.kind === "guide" ? (
+                    <span className="ml-2 rounded-pill bg-violet-wash px-2 py-0.5 align-middle text-2xs font-semibold text-violet-hover">
+                      {list.publishedAt ? "Published gift list" : "Unpublished gift list"}
+                    </span>
+                  ) : null}
+                </p>
                 {/* The URL is what an operator came looking for: it is how a
                     report about a list arrives, and the only way to see what is
                     on one. Opened in a new tab so this screen stays put. */}
@@ -274,7 +314,7 @@ export default async function AdminPage() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* The furniture. All three sections are the same shape, so it is written once. */
+/* The furniture. Every section is the same shape, so it is written once.    */
 /* -------------------------------------------------------------------------- */
 
 function Section({
@@ -282,6 +322,7 @@ function Section({
   count,
   empty,
   note,
+  before,
   children,
 }: {
   title: string;
@@ -290,6 +331,8 @@ function Section({
   empty: string;
   /** A line beside the heading, where a total says more than the count does. */
   note?: string;
+  /** Sits between the heading and the rows: the "add one" form, where there is one. */
+  before?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -303,6 +346,8 @@ function Section({
         </h2>
         {note ? <CapsLabel>{note}</CapsLabel> : null}
       </div>
+
+      {before ? <div className="mb-2.5">{before}</div> : null}
 
       {count === 0 ? (
         <p className="rounded-card border border-dashed border-ink-line-strong px-6 py-10 text-center text-sm text-ink-72">

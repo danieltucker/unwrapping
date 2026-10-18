@@ -1,5 +1,6 @@
 import { CardPhoto } from "@/components/card-photo";
 import { ChipInDialog } from "@/components/chip-in-dialog";
+import { CopyItemButton } from "@/components/copy-dialog";
 import { FundingBar } from "@/components/funding";
 import { fundingLine, isFullyFunded } from "@/lib/funding";
 import {
@@ -161,6 +162,11 @@ export function GiftCard({
           settled={settled}
           surpriseMode={surpriseMode}
         />
+
+        {/* Somebody else's honeymoon fund is not a gift idea; see copyGifts. */}
+        {item.kind === "cash" ? null : (
+          <CopyItemButton itemId={item.id} title={item.title} />
+        )}
       </div>
     </li>
   );

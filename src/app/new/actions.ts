@@ -1,76 +1,16 @@
 "use server";
 
-import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { site } from "@/config/site";
 import { db } from "@/db";
-import { items, lists, type ClaimRule } from "@/db/schema";
+import { items } from "@/db/schema";
 import { parseClaimRule } from "@/lib/claim-rules";
-import { uniqueShortCode } from "@/lib/handle";
+import { insertList } from "@/lib/create-list";
 import { manageList, shareList } from "@/lib/routes";
 import { normalizeUrl, scrapeProduct } from "@/lib/scrape";
-import { ensureDraftToken } from "@/lib/session";
-import { getCurrentUser } from "@/lib/session";
-import { uniqueSlug } from "@/lib/slug";
 
 export type CreateListState = { error?: string };
-
-type NewList = {
-  name: string;
-  emoji: string;
-  eventDate: Date | null;
-  note: string | null;
-  claimRule: ClaimRule;
-  surpriseMode: boolean;
-};
-
-/**
- * Creates a list for whoever is asking: their account if they are signed in,
- * otherwise an anonymous draft tied to this browser. Server Actions only; a
- * draft sets a cookie.
- */
-async function insertList(values: NewList) {
-  const slug = await uniqueSlug(values.name, async (candidate) => {
-    const row = await db
-      .select({ id: lists.id })
-      .from(lists)
-      .where(eq(lists.slug, candidate))
-      .get();
-    return Boolean(row);
-  });
-
-  // The list can exist before the owner does; sign-up is deferred until there
-  // is something to lose. An anonymous draft is tied to a cookie until then.
-  const user = await getCurrentUser();
-  const draftToken = user ? null : await ensureDraftToken();
-
-  // Every list gets a short share code at birth, so there is always something
-  // to paste into a message, including drafts with no owner in their URL yet.
-  const shortCode = await uniqueShortCode(async (candidate) => {
-    const row = await db
-      .select({ id: lists.id })
-      .from(lists)
-      .where(eq(lists.shortCode, candidate))
-      .get();
-    return Boolean(row);
-  });
-
-  const created = await db
-    .insert(lists)
-    .values({
-      ownerId: user?.id ?? null,
-      draftToken,
-      slug,
-      shortCode,
-      ...values,
-    })
-    .returning({ id: lists.id, slug: lists.slug, shortCode: lists.shortCode })
-    .get();
-
-  // A draft has no handle yet, so its URLs use the short code instead.
-  return { list: created, ownerHandle: user?.handle ?? null };
-}
 
 export async function createList(
   _previous: CreateListState,

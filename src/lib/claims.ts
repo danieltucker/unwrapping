@@ -7,6 +7,7 @@ import {
   claims,
   contributions,
   items,
+  lists,
   type ItemKind,
   type List,
 } from "@/db/schema";
@@ -175,7 +176,7 @@ export async function getPublicList(
       kind: item.kind,
       parentId: item.parentId,
       title: item.title,
-      href: outboundHref(item.url),
+      href: outboundHref(item.url, "web", { replaceTags: list.kind === "guide" }),
       sourceDomain: item.sourceDomain,
       image: item.images[item.selectedImageIndex] ?? item.images[0] ?? null,
       emoji: item.emoji,
@@ -291,6 +292,8 @@ export type OwnerStats = {
   boughtCount: number;
   /** Total chipped in across the list's group gifts. */
   raisedCents: number;
+  /** Other people's copies of the whole list. Never whose. */
+  copyCount: number;
 };
 
 /**
@@ -310,11 +313,18 @@ export async function getOwnerStats(list: List): Promise<OwnerStats> {
     .where(and(eq(items.listId, list.id), isNull(claims.releasedAt)))
     .get();
 
+  const copies = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(lists)
+    .where(eq(lists.copiedFromListId, list.id))
+    .get();
+
   return {
     linkOpens: list.linkOpens,
     claimedCount: claimed?.count ?? 0,
     boughtCount: claimed?.bought ?? 0,
     raisedCents: await raisedForList(list.id),
+    copyCount: copies?.count ?? 0,
   };
 }
 

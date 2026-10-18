@@ -67,6 +67,40 @@ export const sessions = sqliteTable(
 export const CLAIM_RULES = ["anonymous", "firstName", "account"] as const;
 export type ClaimRule = (typeof CLAIM_RULES)[number];
 
+/**
+ * What a gift list is for.
+ *
+ * "personal" is the product as it started: one person's wishlist, shared with
+ * the people buying for them, with claims, surprise and an address.
+ *
+ * "guide" is a list for nobody in particular — gift ideas for PC gamers, for
+ * someone who camps — written to be browsed and copied from. Nothing on it is
+ * claimed, because a thousand people can all buy the same headlamp. It is
+ * public in a way a personal list never is: once published it is listed on
+ * /gifts, in the sitemap, and open to search engines.
+ *
+ * Chosen when the list is made and never changed. A personal list that has
+ * had claims made on it must never turn into a public page, and the way to
+ * publish one is to copy it into a new guide.
+ */
+export const LIST_KINDS = ["personal", "guide"] as const;
+export type ListKind = (typeof LIST_KINDS)[number];
+
+/**
+ * The shelves on /gifts: "Outdoors", "Gaming". Curated by the operator from
+ * /admin and nobody else, so the browse page reads like a shop rather than a
+ * tag cloud. Listed alphabetically.
+ */
+export const categories = sqliteTable("categories", {
+  id: id(),
+  /** /gifts/<slug>. Kept when the name changes, so links to it still work. */
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  emoji: text("emoji").notNull().default("🎁"),
+  createdAt: createdAt(),
+});
+
 export const lists = sqliteTable(
   "lists",
   {
@@ -104,6 +138,39 @@ export const lists = sqliteTable(
      * someone who has already chipped in.
      */
     paymentDetails: text("payment_details"),
+    /**
+     * Whether someone other than the owner may copy this list's gifts into a
+     * list of their own. On by default: a well-chosen list is useful to more
+     * people than the one it was made for. The owner can always copy their
+     * own list, whatever this says.
+     *
+     * A copy takes the gifts and nothing about them — no claims, no money, no
+     * address. See copyGifts, which is the only place one is made.
+     */
+    allowCopying: integer("allow_copying", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    /**
+     * The list this one was copied from as a whole, kept so the original can
+     * say "copied 12 times". A count is all it is ever used for: the owner of
+     * the original never learns whose copy is whose.
+     */
+    copiedFromListId: text("copied_from_list_id").references(
+      (): AnySQLiteColumn => lists.id,
+      { onDelete: "set null" },
+    ),
+    /** See LIST_KINDS. Fixed at creation. */
+    kind: text("kind", { enum: LIST_KINDS }).notNull().default("personal"),
+    /** A guide's shelf on /gifts. Always null on a personal list. */
+    categoryId: text("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
+    /**
+     * When a guide's owner put it on /gifts. Null means it is reachable by its
+     * link like any list, and nowhere else: not browsable, not in the sitemap,
+     * and not indexed. Always null on a personal list.
+     */
+    publishedAt: integer("published_at", { mode: "timestamp" }),
     // Owner-visible aggregate. Never broken down per item or per guest.
     linkOpens: integer("link_opens").notNull().default(0),
     sharedAt: integer("shared_at", { mode: "timestamp" }),
@@ -113,6 +180,8 @@ export const lists = sqliteTable(
     index("lists_owner_idx").on(t.ownerId),
     index("lists_draft_idx").on(t.draftToken),
     uniqueIndex("lists_owner_slug_idx").on(t.ownerId, t.slug),
+    index("lists_copied_from_idx").on(t.copiedFromListId),
+    index("lists_published_idx").on(t.kind, t.publishedAt),
   ],
 );
 
@@ -276,6 +345,7 @@ export const contributions = sqliteTable(
 );
 
 export type User = typeof users.$inferSelect;
+export type Category = typeof categories.$inferSelect;
 export type List = typeof lists.$inferSelect;
 export type Item = typeof items.$inferSelect;
 export type Claim = typeof claims.$inferSelect;

@@ -47,6 +47,17 @@ export function shareList(list: ListRef, ownerHandle: string | null): string {
   return `${manageList(list, ownerHandle)}/share`;
 }
 
+/**
+ * Gift guides: lists for nobody in particular, browsed by category. A guide
+ * itself still lives at /lists/<handle>/<slug> like any list; these are the
+ * shelves it sits on.
+ */
+export const giftGuides = "/gifts";
+export const newGiftGuide = "/gifts/new";
+export function giftCategory(slug: string): string {
+  return `/gifts/${slug}`;
+}
+
 export const signIn = "/sign-in";
 export const signUp = "/sign-up";
 export const newList = "/new";

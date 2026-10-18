@@ -41,12 +41,21 @@ export default async function MyListsPage() {
         <h1 className="font-display text-[2.5rem] leading-[1.05] tracking-[-0.03em]">
           My lists
         </h1>
-        <Link
-          href={routes.newList}
-          className="rounded-pill bg-violet px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
-        >
-          + New list
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* A wishlist is the everyday thing, so it keeps the filled button. */}
+          <Link
+            href={routes.newGiftGuide}
+            className="rounded-pill border border-ink-line-strong bg-surface px-5 py-2.5 text-sm font-semibold transition-colors duration-150 hover:bg-ink/[.03]"
+          >
+            + New gift list for anyone
+          </Link>
+          <Link
+            href={routes.newList}
+            className="rounded-pill bg-violet px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-violet-hover"
+          >
+            + New list
+          </Link>
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -65,6 +74,11 @@ export default async function MyListsPage() {
                 <span className="min-w-0 flex-1">
                   <span className="block text-base font-semibold">{list.name}</span>
                   <span className="block text-xs text-ink-72">
+                    {list.kind === "guide"
+                      ? list.publishedAt
+                        ? "Gift list · published · "
+                        : "Gift list · not published · "
+                      : null}
                     {giftCount} {giftCount === 1 ? "gift" : "gifts"}
                     {list.eventDate ? ` · ${relativeEvent(list.eventDate)}` : ""}
                   </span>

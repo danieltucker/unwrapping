@@ -33,9 +33,17 @@ const REFERRAL_TAGS: Record<
 
 export type LinkContext = "web" | "email";
 
+/**
+ * `replaceTags` is for gift guides. On someone's own wishlist a link that
+ * already carries a tag is left alone — it may be a friend's, and it is theirs
+ * to share. A guide is a public page we list, index and put our disclosure on,
+ * so a tag pasted into one is replaced with ours rather than earning for a
+ * stranger under our name.
+ */
 export function outboundHref(
   url: string | null | undefined,
   context: LinkContext = "web",
+  { replaceTags = false }: { replaceTags?: boolean } = {},
 ): string | null {
   if (!url) return null;
 
@@ -54,7 +62,7 @@ export function outboundHref(
   if (context === "email") return parsed.toString();
 
   const tag = REFERRAL_TAGS[sourceDomain(parsed.toString()) ?? ""];
-  if (tag && !parsed.searchParams.has(tag.param)) {
+  if (tag && (replaceTags || !parsed.searchParams.has(tag.param))) {
     parsed.searchParams.set(tag.param, tag.value);
   }
 

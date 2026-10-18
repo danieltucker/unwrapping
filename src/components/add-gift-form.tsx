@@ -15,6 +15,7 @@ import {
   usePhotoPaste,
 } from "@/components/gift-photo-fields";
 import { GoalField } from "@/components/goal-field";
+import { useIsGuide } from "@/components/list-kind";
 import { MoveIntoIdea, type MovableGift } from "@/components/move-into-idea";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
 import { centsToInput } from "@/config/site";
@@ -98,6 +99,8 @@ function AddGiftFlow({
   );
   const [manual, setManual] = useState<ScrapeResult | null>(null);
   const [kind, setKind] = useState<ItemKind>("thing");
+  // A guide is for nobody in particular, so there is nobody to send money to.
+  const guide = useIsGuide();
   // The fourth route out of the first step, and the only one that adds nothing:
   // the present is already on the list and just belongs somewhere else on it.
   const [picking, setPicking] = useState(false);
@@ -258,19 +261,21 @@ function AddGiftFlow({
 
         {parentId ? null : (
           <>
-            <button
-              type="button"
-              onClick={() => {
-                setKind("cash");
-                setManual(EMPTY_MANUAL);
-              }}
-              className="w-full rounded-control border border-ink-line bg-surface px-[15px] py-[13px] text-left transition-colors duration-150 hover:bg-ink/[.03]"
-            >
-              <span className="block text-sm font-semibold">Ask for money instead</span>
-              <span className="block text-xs text-ink-72">
-                Toward something big, or just cash. Guests give what they like
-              </span>
-            </button>
+            {guide ? null : (
+              <button
+                type="button"
+                onClick={() => {
+                  setKind("cash");
+                  setManual(EMPTY_MANUAL);
+                }}
+                className="w-full rounded-control border border-ink-line bg-surface px-[15px] py-[13px] text-left transition-colors duration-150 hover:bg-ink/[.03]"
+              >
+                <span className="block text-sm font-semibold">Ask for money instead</span>
+                <span className="block text-xs text-ink-72">
+                  Toward something big, or just cash. Guests give what they like
+                </span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -283,7 +288,7 @@ function AddGiftFlow({
               <span className="block text-sm font-semibold">Suggest an idea</span>
               <span className="block text-xs text-ink-72">
                 &ldquo;Knitting&rdquo;, &ldquo;Xbox games&rdquo;. A direction to shop
-                in, for guests who&rsquo;d rather choose
+                in, for {guide ? "anyone" : "guests"} who&rsquo;d rather choose
               </span>
             </button>
           </>
@@ -367,6 +372,9 @@ function ConfirmGift({
   // shown and ignored.
   const cash = kind === "cash";
   const idea = kind === "idea";
+  // Nobody buys from a guide for one person, so there are no units to count
+  // and nothing to chip in on; the reason is a recommendation, not a wish.
+  const guide = useIsGuide();
 
   const priceValue = centsToInput(result.priceCents);
 
@@ -468,20 +476,22 @@ function ConfirmGift({
                     className="py-[9px] text-sm"
                   />
                 </div>
-                <div className="w-[72px] shrink-0">
-                  <label htmlFor="quantity">
-                    <CapsLabel className="mb-[5px] text-2xs">Qty</CapsLabel>
-                  </label>
-                  <Input
-                    id="quantity"
-                    name="quantity"
-                    type="number"
-                    min={1}
-                    max={20}
-                    defaultValue={1}
-                    className="py-[9px] text-sm"
-                  />
-                </div>
+                {guide ? null : (
+                  <div className="w-[72px] shrink-0">
+                    <label htmlFor="quantity">
+                      <CapsLabel className="mb-[5px] text-2xs">Qty</CapsLabel>
+                    </label>
+                    <Input
+                      id="quantity"
+                      name="quantity"
+                      type="number"
+                      min={1}
+                      max={20}
+                      defaultValue={1}
+                      className="py-[9px] text-sm"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -492,7 +502,13 @@ function ConfirmGift({
         <div className="mb-4">
           <label htmlFor="reason">
             <CapsLabel className="mb-[5px] text-2xs">
-              {cash ? "What it's for" : idea ? "What to look for" : "Why you want it"}
+              {cash
+                ? "What it's for"
+                : idea
+                  ? "What to look for"
+                  : guide
+                    ? "Why it's a good pick"
+                    : "Why you want it"}
             </CapsLabel>
           </label>
           {/* This copy is what makes the public list feel personal, and on an
@@ -508,7 +524,9 @@ function ConfirmGift({
                 ? "We're putting everything toward the honeymoon, so this helps more than anything wrapped."
                 : idea
                   ? "She's just started and has almost no supplies yet. Chunky wool, bamboo needles, that sort of thing."
-                  : "Mine cracked in the move and I've been drinking sad instant coffee since July."
+                  : guide
+                    ? "Quiet enough for a shared flat at 2am, and the keycaps survive years of use."
+                    : "Mine cracked in the move and I've been drinking sad instant coffee since July."
             }
             className="text-sm"
           />
@@ -516,10 +534,12 @@ function ConfirmGift({
 
         <div className="mb-5 flex flex-col gap-2">
           <label className="flex cursor-pointer items-center justify-between rounded-control border border-ink-line bg-surface px-[13px] py-[11px]">
-            <span className="text-sm font-semibold">Mark as most wanted</span>
+            <span className="text-sm font-semibold">
+              {guide ? "Mark as a top pick" : "Mark as most wanted"}
+            </span>
             <input type="checkbox" name="isMostWanted" className="h-4 w-4 accent-violet" />
           </label>
-          {cash || idea ? null : (
+          {cash || idea || guide ? null : (
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-control border border-ink-line bg-surface px-[13px] py-[11px]">
               <span>
                 <span className="block text-sm font-semibold">

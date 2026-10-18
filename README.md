@@ -118,10 +118,12 @@ A few things worth knowing before you change them:
   one place later. Never render a raw `item.url`.
 - **Money is integer cents** everywhere. `formatPrice` in `src/config/site.ts`
   is the only place that renders it.
-- **Nothing but `/` is indexable.** Pages under `/lists` are `noindex` through
-  [`src/app/lists/layout.tsx`](src/app/lists/layout.tsx), and `robots.txt`
-  allows only the landing page. A list is unlisted, not secret, so a crawler
-  that found one would publish somebody's birthday.
+- **Only public pages are indexable:** `/`, `/gifts` and its categories, and
+  each *published* gift guide. Every other page under `/lists` is `noindex`
+  through [`src/app/lists/layout.tsx`](src/app/lists/layout.tsx), and
+  `robots.txt` allows published guides by their exact path. A wishlist is
+  unlisted, not secret, so a crawler that found one would publish somebody's
+  birthday.
 - **Landing-page copy may only promise what exists.** The FAQ answers in
   `src/app/page.tsx` are also served as schema.org `FAQPage`, where a promise
   outlives the page. Read "Not built yet" below before adding one.

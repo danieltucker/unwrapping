@@ -1,7 +1,8 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { items } from "@/db/schema";
@@ -12,8 +13,10 @@ import {
   MIN_CONTRIBUTION_CENTS,
   type ContributionOutcome,
 } from "@/lib/contributions";
+import { copyGifts, ownedDestination, pickRows } from "@/lib/copying";
+import { insertList } from "@/lib/create-list";
 import { resolveList, viewerOwns } from "@/lib/list-access";
-import { publicList } from "@/lib/routes";
+import { manageList, publicList } from "@/lib/routes";
 import { setItemBought } from "@/lib/reservations";
 import { parsePriceToCents } from "@/lib/scrape-parse";
 import {
@@ -29,6 +32,13 @@ const MESSAGES = {
   missing: "That gift is no longer on the list.",
   "already-yours": "You've already reserved this one.",
 } as const;
+
+/**
+ * A gift guide is for anyone, so nothing on it is reserved: a thousand people
+ * can buy the same headlamp. The page never offers it; the actions refuse it.
+ */
+const GUIDE_MESSAGE =
+  "This is a gift list for anyone, so there's nothing to reserve. Buy it straight from the shop, or add it to a list of your own.";
 
 /** The same three answers, for something that was never exclusive to begin with. */
 const IDEA_MESSAGES = {
@@ -48,6 +58,7 @@ export async function reserveGift(
 
   const resolved = await resolveList(handle, key);
   if (!resolved) return { error: MESSAGES.missing };
+  if (resolved.list.kind === "guide") return { error: GUIDE_MESSAGE };
 
   // Verify the item really belongs to this list before writing anything.
   const item = await db.select().from(items).where(eq(items.id, itemId)).get();
@@ -138,6 +149,7 @@ export async function chipIn(
 
   const resolved = await resolveList(handle, key);
   if (!resolved) return { error: MESSAGES.missing };
+  if (resolved.list.kind === "guide") return { error: GUIDE_MESSAGE };
 
   // An owner chipping in to their own list would only confuse their own totals.
   if (await viewerOwns(resolved)) {
@@ -195,4 +207,124 @@ export async function markGiftBought(
 
   revalidatePath(publicList(resolved.list, resolved.ownerHandle));
   return { ok: true };
+}
+
+export type CopyState = {
+  error?: string;
+  /** Set when gifts went onto a list that already existed. */
+  added?: { count: number; listName: string; href: string };
+};
+
+/** What a new list made by copying a single gift is called until it's renamed. */
+const COPY_STARTER_NAME = "My wishlist";
+
+/**
+ * Copies a whole list, or one gift from it, onto a list the viewer owns.
+ *
+ * `destination` is either a list id or "new". A new list is created for
+ * whoever is asking, exactly as /new would — an anonymous visitor gets a draft
+ * held in this browser — and they are taken straight to its editor. Gifts
+ * added to a list they already had are confirmed in the dialog instead, so
+ * they can carry on browsing the list they found them on.
+ *
+ * What a copy takes, and what it leaves behind, is decided in copyGifts.
+ */
+export async function copyToList(
+  _previous: CopyState,
+  formData: FormData,
+): Promise<CopyState> {
+  const handle = String(formData.get("handle") ?? "");
+  const key = String(formData.get("key") ?? "");
+  // Empty for the whole list.
+  const itemId = String(formData.get("itemId") ?? "") || null;
+  const destination = String(formData.get("destination") ?? "new");
+
+  const source = await resolveList(handle, key);
+  if (!source) return { error: "That list is no longer here." };
+
+  // The owner may always copy their own list; the switch is about everyone else.
+  const isOwner = await viewerOwns(source);
+  if (!isOwner && !source.list.allowCopying) {
+    return { error: "The owner of this list has turned copying off." };
+  }
+
+  const rows = await db
+    .select()
+    .from(items)
+    .where(eq(items.listId, source.list.id))
+    .orderBy(asc(items.position))
+    .all();
+
+  const picked = pickRows(rows, itemId);
+  if (picked === null) return { error: MESSAGES.missing };
+  if (picked.length === 0) {
+    return {
+      error: itemId
+        ? "An ask for money stays with the list it was made for."
+        : "There's nothing on this list that can be copied yet.",
+    };
+  }
+
+  // A guide's reasons are recommendations written for strangers, so they
+  // always travel; a wishlist's are personal, so only its owner keeps them.
+  // "Most wanted" and "top pick" are different claims, so the flag only
+  // survives a copy between lists of the same kind, and only for the owner
+  // or from a guide.
+  const fromGuide = source.list.kind === "guide";
+  const options = (intoGuide: boolean) => ({
+    keepReasons: isOwner || fromGuide,
+    keepMostWanted: (isOwner || fromGuide) && intoGuide === fromGuide,
+    intoGuide,
+  });
+
+  if (destination === "new") {
+    const fallback = itemId ? COPY_STARTER_NAME : source.list.name;
+    const name = String(formData.get("name") ?? "").trim() || fallback;
+    if (name.length > 80) return { error: "That name is a little long." };
+
+    const { list, ownerHandle } = await insertList({
+      name,
+      emoji: itemId ? "🎁" : source.list.emoji,
+      // A new occasion: the date is always theirs to set.
+      eventDate: null,
+      // The note and the rules are the original owner's say-so, so only the
+      // owner's own duplicate keeps them.
+      note: isOwner && !itemId && !fromGuide ? source.list.note : null,
+      claimRule: isOwner && !fromGuide ? source.list.claimRule : "anonymous",
+      surpriseMode: isOwner && !fromGuide ? source.list.surpriseMode : true,
+      // Only a stranger's copy of the whole list counts toward "copied N
+      // times"; an owner duplicating their own is not an endorsement.
+      copiedFromListId: !isOwner && !itemId ? source.list.id : null,
+    });
+
+    // Always a wishlist: a new gift guide starts from /gifts/new.
+    copyGifts(picked, list.id, options(false));
+
+    // redirect() throws a control-flow exception, so it must sit outside try/catch.
+    redirect(`${manageList(list, ownerHandle)}?started=copy`);
+  }
+
+  const dest = await ownedDestination(destination);
+  if (!dest) {
+    return {
+      error:
+        "We couldn't confirm that list is yours — your sign-in may have run out. Reload the page and try again.",
+    };
+  }
+  if (dest.list.id === source.list.id) {
+    return { error: "These gifts are already on that list." };
+  }
+
+  const count = copyGifts(picked, dest.list.id, options(dest.list.kind === "guide"));
+
+  revalidatePath(manageList(dest.list, dest.ownerHandle));
+  revalidatePath(publicList(dest.list, dest.ownerHandle));
+
+  return {
+    added: {
+      count,
+      listName: dest.list.name,
+      href: manageList(dest.list, dest.ownerHandle),
+    },
+  };
 }

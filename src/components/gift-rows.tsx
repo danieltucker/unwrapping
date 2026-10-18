@@ -6,6 +6,7 @@ import { reorderGifts } from "@/app/lists/[handle]/[slug]/manage/actions";
 import { AddGiftDialog } from "@/components/add-gift-dialog";
 import { EditGiftDialog } from "@/components/edit-gift-dialog";
 import { FundingBar } from "@/components/funding";
+import { useIsGuide } from "@/components/list-kind";
 import type { IdeaOption, MovableGift } from "@/components/move-into-idea";
 import { fundingLine } from "@/lib/funding";
 import { formatPrice } from "@/config/site";
@@ -76,6 +77,9 @@ export function GiftRows({
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [error, setError] = useState<string | null>(null);
+  // The same flag reads "top pick" on a guide, which is a recommendation
+  // rather than a wish.
+  const guide = useIsGuide();
 
   const everything = flatten(rows);
 
@@ -128,7 +132,7 @@ export function GiftRows({
                   : "border border-ink-line-strong bg-surface text-ink-72 hover:bg-ink/[.03]"
               }`}
             >
-              {FILTER_LABELS[key]} {count}
+              {guide && key === "wanted" ? "Top picks" : FILTER_LABELS[key]} {count}
             </button>
           );
         })}
@@ -329,6 +333,7 @@ function GiftRow({
   onDragOver: () => void;
   onMove: (offset: number) => void;
 }) {
+  const guide = useIsGuide();
   const needsPhoto = row.item.needsAttention === "no-photo";
   const photo = row.item.images[row.item.selectedImageIndex] ?? row.item.images[0];
   const isIdea = row.item.kind === "idea";
@@ -415,7 +420,9 @@ function GiftRow({
               {row.item.title}
             </span>
             {isIdea ? <Badge tone="neutral">Idea</Badge> : null}
-            {row.item.isMostWanted ? <Badge tone="violet">Most wanted</Badge> : null}
+            {row.item.isMostWanted ? (
+              <Badge tone="violet">{guide ? "Top pick" : "Most wanted"}</Badge>
+            ) : null}
             {row.item.isGroupGift ? (
               <Badge tone="rose">
                 {row.contributorCount > 0

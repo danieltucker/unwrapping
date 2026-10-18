@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { GuideGrid, GuideTile } from "@/components/guide-tile";
 import { StartFromGiftForm } from "@/components/start-from-gift-form";
 import {
   BoxIcon,
@@ -13,6 +14,7 @@ import {
   WalletIcon,
 } from "@/components/ui";
 import { formatPrice, listUrl, occasions, site } from "@/config/site";
+import { allCategories, publishedGuides } from "@/lib/guides";
 import { origin } from "@/lib/origin";
 import * as routes from "@/lib/routes";
 
@@ -20,10 +22,14 @@ import * as routes from "@/lib/routes";
  * Screen 01: the landing page. Its whole job is to turn a first-time visitor
  * into a list, so every section ends up pointing at /new.
  *
- * It is also the only page search engines are allowed to index (a gift list is
- * nobody's business but its guests'), which is why the explaining happens here
- * rather than on an about page: the occasions, what can go on a list, and the
- * questions people ask before trusting a party to a website they don't know.
+ * It is also, with /gifts and the guides on it, one of the only pages search
+ * engines are allowed to index (a wishlist is nobody's business but its
+ * guests'), which is why the explaining happens here rather than on an about
+ * page: the occasions, what can go on a list, and the questions people ask
+ * before trusting a party to a website they don't know.
+ *
+ * The gift lists section is the other way in: someone who doesn't yet know
+ * what they want can start from a list somebody else made.
  *
  * The hero is one full-bleed ink banner built around a single input: the
  * first gift, as a link or just its name. Everything else in it (the pitch,
@@ -44,6 +50,7 @@ export default function Home() {
     <main className="mx-auto w-full max-w-[120rem] flex-1">
       <Hero />
       <HowItWorks />
+      <GiftGuides />
       <Occasions />
       <WhatGoesOn />
       <Questions />
@@ -151,6 +158,15 @@ function Hero() {
               className="font-semibold text-paper underline-offset-2 hover:underline"
             >
               How it works
+            </Link>
+          </span>{" "}
+          <span className="whitespace-nowrap">
+            {"· "}
+            <Link
+              href={routes.giftGuides}
+              className="font-semibold text-paper underline-offset-2 hover:underline"
+            >
+              Browse gift lists
             </Link>
           </span>
         </p>
@@ -338,6 +354,66 @@ function Step({
       <h3 className="mb-[7px] text-base font-semibold">{title}</h3>
       <p className="text-sm leading-[1.7] text-ink-76">{children}</p>
     </li>
+  );
+}
+
+/**
+ * Gift lists other people made, for a visitor who arrived without one in mind.
+ *
+ * Each tile is one click from a list they can buy from or copy, which is a
+ * shorter road to their own list than an empty form. The section leaves the
+ * page entirely until something has been published: a "browse" heading over
+ * nothing would be the first broken promise on the site.
+ */
+async function GiftGuides() {
+  const [guides, categories] = await Promise.all([
+    publishedGuides({ order: "popular", limit: 6 }),
+    allCategories(),
+  ]);
+  if (guides.length === 0) return null;
+
+  const stocked = categories.filter((category) => category.guideCount > 0);
+
+  return (
+    <Section
+      id="gift-lists"
+      heading="Not sure what to ask for?"
+      intro="Start from a gift list someone else put together: ideas for gamers, campers, cooks and more. Buy straight from one, or copy it and make it yours."
+    >
+      {stocked.length > 0 ? (
+        <ul className="mb-6 flex flex-wrap gap-2.5">
+          {stocked.map((category) => (
+            <li key={category.id}>
+              <Link
+                href={routes.giftCategory(category.slug)}
+                className="inline-flex items-center gap-2 rounded-pill border border-ink-line-strong bg-surface px-4 py-2.5 text-sm font-semibold transition-colors duration-150 hover:border-violet hover:bg-violet-wash"
+              >
+                <span aria-hidden="true">{category.emoji}</span>
+                {category.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <GuideGrid>
+        {guides.map((guide) => (
+          <GuideTile key={guide.id} guide={guide} />
+        ))}
+      </GuideGrid>
+
+      <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+        <ButtonLink href={routes.giftGuides} variant="outline">
+          Browse all gift lists
+        </ButtonLink>
+        <Link
+          href={routes.newGiftGuide}
+          className="text-sm font-semibold text-violet underline-offset-2 hover:underline"
+        >
+          Make one for other people
+        </Link>
+      </div>
+    </Section>
   );
 }
 
