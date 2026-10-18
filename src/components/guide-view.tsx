@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { CardPhoto } from "@/components/card-photo";
 import { CopyItemButton, CopyListButton } from "@/components/copy-dialog";
+import { PriceChange } from "@/components/price-change";
 import { ReferralDisclosure } from "@/components/referral-disclosure";
 import { Avatar, EyeOffIcon } from "@/components/ui";
 import { formatPrice } from "@/config/site";
@@ -229,6 +230,12 @@ function GuideGiftCard({ item }: { item: PublicItem }) {
             </span>
           ) : null}
         </div>
+
+        <PriceChange
+          nowCents={item.priceCents}
+          wasCents={item.wasPriceCents}
+          className="-mt-[3px] mb-[9px]"
+        />
 
         <p className="mb-[14px] flex-1 text-sm leading-[1.65] text-ink-76">{item.reason}</p>
 

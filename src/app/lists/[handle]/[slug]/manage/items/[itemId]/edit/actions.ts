@@ -10,6 +10,7 @@ import { parseGiftEmoji } from "@/lib/emoji";
 import { moveUnderIdea } from "@/lib/item-moves";
 import { requireOwnedList, type ResolvedList } from "@/lib/list-access";
 import { sourceDomain } from "@/lib/outbound";
+import { recordPrice } from "@/lib/price-checks";
 import * as routes from "@/lib/routes";
 import { parsePriceToCents, scrapeProduct } from "@/lib/scrape";
 
@@ -102,6 +103,14 @@ export async function updateItem(
     .set({
       title,
       priceCents,
+      // A price that was edited is the owner's now, and the recheck leaves it
+      // alone from here on. One that was left as it was keeps its source.
+      priceSource:
+        priceCents === item.priceCents
+          ? item.priceSource
+          : priceCents === null
+            ? null
+            : "owner",
       quantity: item.kind === "thing" ? quantity : 1,
       selectedImageIndex,
       emoji,
@@ -156,7 +165,8 @@ export async function deleteItem(
  * Re-reads the product page and fills in what the shop now gives us.
  *
  * A price typed by hand is kept, because the owner's own correction outranks a
- * scrape, but a missing title or photo is replaced gladly.
+ * scrape, but a missing title or photo is replaced gladly, and a price that
+ * came from the shop in the first place follows the shop.
  */
 export async function refetchItem(
   _previous: EditItemState,
@@ -177,7 +187,12 @@ export async function refetchItem(
   if (result.images.length && result.images.join() !== item.images.join()) {
     changes.push(`${result.images.length} photo${result.images.length === 1 ? "" : "s"}`);
   }
-  if (item.priceCents === null && result.priceCents !== null) changes.push("price");
+  // The shop's price replaces an empty one or an earlier shop price; a price
+  // the owner typed stays put.
+  const takesShopPrice =
+    result.priceCents !== null && item.priceSource !== "owner";
+  const priceCents = takesShopPrice ? result.priceCents : item.priceCents;
+  if (takesShopPrice && result.priceCents !== item.priceCents) changes.push("price");
 
   await db
     .update(items)
@@ -188,12 +203,15 @@ export async function refetchItem(
       images: result.images.length ? result.images : item.images,
       selectedImageIndex: 0,
       // Never clobber a price the owner typed themselves.
-      priceCents: item.priceCents ?? result.priceCents,
-      currency:
-        item.priceCents === null ? (result.currency ?? item.currency) : item.currency,
+      priceCents,
+      priceSource: takesShopPrice ? "scrape" : item.priceSource,
+      currency: takesShopPrice ? (result.currency ?? item.currency) : item.currency,
       needsAttention: result.images.length === 0 ? "no-photo" : null,
     })
     .where(eq(items.id, itemId));
+
+  // Whatever the gift ended up with, the shop's own price is history.
+  await recordPrice(result.url, result.priceCents, result.currency);
 
   // The form reads the gift from the editor behind it, so refreshing the list
   // is what puts a re-read title and its new photos on screen.

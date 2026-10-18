@@ -17,6 +17,7 @@ import { resolveList, viewerOwns } from "@/lib/list-access";
 import { readGuestToken } from "@/lib/session";
 import { viewerScope } from "@/lib/viewer";
 import { outboundHref } from "@/lib/outbound";
+import { linkInfo } from "@/lib/price-checks";
 
 export type PublicItem = {
   id: string;
@@ -39,6 +40,11 @@ export type PublicItem = {
   /** Stands in for the photo when there is none. */
   emoji: string | null;
   priceCents: number | null;
+  /**
+   * What the shop charged when this gift was added, if its price has moved
+   * since. Only ever set for a price that came from the shop; see linkInfo.
+   */
+  wasPriceCents: number | null;
   quantity: number;
   reason: string | null;
   isMostWanted: boolean;
@@ -139,6 +145,9 @@ export async function getPublicList(
   // is theirs to see, who paid it is not.
   const funding = await fundingForList(list.id);
 
+  // Price moves since each gift was added. Public: it's the shop's price.
+  const links = await linkInfo(rows);
+
   // The viewer's own chip-ins, so a card can show what they already gave.
   const mineScope = viewerIsOwner
     ? null
@@ -181,6 +190,7 @@ export async function getPublicList(
       image: item.images[item.selectedImageIndex] ?? item.images[0] ?? null,
       emoji: item.emoji,
       priceCents: item.priceCents,
+      wasPriceCents: links.get(item.id)?.wasCents ?? null,
       quantity: item.quantity,
       reason: item.reason,
       isMostWanted: item.isMostWanted,

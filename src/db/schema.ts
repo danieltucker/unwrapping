@@ -208,6 +208,9 @@ export const lists = sqliteTable(
 export const ITEM_KINDS = ["thing", "cash", "idea"] as const;
 export type ItemKind = (typeof ITEM_KINDS)[number];
 
+export const PRICE_SOURCES = ["scrape", "owner"] as const;
+export type PriceSource = (typeof PRICE_SOURCES)[number];
+
 export const items = sqliteTable(
   "items",
   {
@@ -252,6 +255,13 @@ export const items = sqliteTable(
     emoji: text("emoji"),
     /** Integer cents. Null when the scrape found no price, never guessed. */
     priceCents: integer("price_cents"),
+    /**
+     * Where the price came from. "scrape" is the shop's own figure, which the
+     * monthly recheck keeps up to date; "owner" was typed by hand, and nothing
+     * automatic ever overwrites it. Null when there is no price. See
+     * src/lib/price-checks.ts.
+     */
+    priceSource: text("price_source", { enum: PRICE_SOURCES }),
     currency: text("currency").notNull().default("USD"),
     quantity: integer("quantity").notNull().default(1),
     /** The owner's "why you want it" copy; what makes the public list personal. */
@@ -342,6 +352,60 @@ export const contributions = sqliteTable(
     index("contributions_item_idx").on(t.itemId),
     index("contributions_user_idx").on(t.userId),
   ],
+);
+
+/**
+ * What the last recheck of a product link found. See src/lib/price-checks.ts.
+ *
+ * "gone" is a 404 or 410: the shop says the page no longer exists.
+ * "unreadable" is everything else that stopped us reading it — bot protection,
+ * a timeout, a challenge page — and says nothing about whether the product is
+ * still for sale. Big retailers block us every time, so treating that as a
+ * dead link would flag half of every list.
+ */
+export const LINK_STATUSES = ["ok", "gone", "unreadable"] as const;
+export type LinkStatus = (typeof LINK_STATUSES)[number];
+
+/**
+ * One row per product link we have rechecked, keyed by the URL as items store
+ * it.
+ *
+ * Keyed by link rather than by gift, because copying makes the same headlamp
+ * appear on hundreds of lists, and it should be fetched once a month, not once
+ * per list.
+ */
+export const productChecks = sqliteTable("product_checks", {
+  url: text("url").primaryKey(),
+  checkedAt: integer("checked_at", { mode: "timestamp" }).notNull(),
+  status: text("status", { enum: LINK_STATUSES }).notNull(),
+  /** 404s and 410s in a row. Two is when a link is called dead. */
+  goneStreak: integer("gone_streak").notNull().default(0),
+  /** Checks in a row that couldn't read the page at all. */
+  failStreak: integer("fail_streak").notNull().default(0),
+  /** The scraper's own word for the last outcome, for the admin screen. */
+  detail: text("detail"),
+});
+
+/**
+ * Every price a product link has been seen at, oldest first.
+ *
+ * A row is written when a link is first priced and then only when the price
+ * changes, so a link that has cost the same for a year is still one row. Read
+ * against a gift's createdAt it answers "has this gone up or down since it was
+ * added?" — see priceTrends.
+ */
+export const priceHistory = sqliteTable(
+  "price_history",
+  {
+    id: id(),
+    url: text("url").notNull(),
+    priceCents: integer("price_cents").notNull(),
+    currency: text("currency").notNull(),
+    observedAt: integer("observed_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("price_history_url_idx").on(t.url, t.observedAt)],
 );
 
 export type User = typeof users.$inferSelect;

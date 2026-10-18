@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { items } from "@/db/schema";
 import { parseClaimRule } from "@/lib/claim-rules";
 import { insertList } from "@/lib/create-list";
+import { recordPrice } from "@/lib/price-checks";
 import { manageList, shareList } from "@/lib/routes";
 import { normalizeUrl, scrapeProduct } from "@/lib/scrape";
 
@@ -109,9 +110,11 @@ export async function startFromGift(
       images: result.images,
       selectedImageIndex: 0,
       priceCents: result.priceCents,
+      priceSource: result.priceCents === null ? null : "scrape",
       currency: (result.currency ?? site.currency).toUpperCase(),
       needsAttention: result.images.length === 0 ? "no-photo" : null,
     });
+    await recordPrice(result.url || null, result.priceCents, result.currency ?? site.currency);
   } else {
     // A hand-written gift stands in with an emoji, which counts as a choice
     // rather than a missing photo, so it isn't flagged in the editor.

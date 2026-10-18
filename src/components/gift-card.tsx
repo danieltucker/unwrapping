@@ -2,6 +2,7 @@ import { CardPhoto } from "@/components/card-photo";
 import { ChipInDialog } from "@/components/chip-in-dialog";
 import { CopyItemButton } from "@/components/copy-dialog";
 import { FundingBar } from "@/components/funding";
+import { PriceChange } from "@/components/price-change";
 import { fundingLine, isFullyFunded } from "@/lib/funding";
 import {
   BoughtButton,
@@ -106,6 +107,15 @@ export function GiftCard({
             </span>
           ) : null}
         </div>
+
+        {/* Nobody needs to know the price moved on a gift that's handled. */}
+        {settled ? null : (
+          <PriceChange
+            nowCents={item.priceCents}
+            wasCents={item.wasPriceCents}
+            className="-mt-[3px] mb-[9px]"
+          />
+        )}
 
         {item.isGroupGift ? (
           <div className="mb-[10px]">

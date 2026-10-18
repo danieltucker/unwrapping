@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { categories, items, lists, users } from "@/db/schema";
 import { adminOrNull } from "@/lib/admin";
+import { priceCheckState, runPriceChecks } from "@/lib/price-checks";
 import * as routes from "@/lib/routes";
 import { slugify } from "@/lib/slug";
 import { deleteUpload } from "@/lib/uploads";
@@ -273,4 +274,24 @@ export async function deleteCategory(
   revalidatePath(routes.giftGuides, "layout");
   revalidatePath("/");
   return { ok: true, message: `Deleted “${category.name}”.` };
+}
+
+/**
+ * Starts a batch of price and link checks now rather than waiting for the
+ * hourly one. Answers straight away: the batch pauses between shops, so it
+ * runs on in the background and the screen reports it on the next load.
+ */
+export async function checkLinksNow(): Promise<AdminState> {
+  const admin = await adminOrNull();
+  if (!admin) return { error: NOT_ADMIN };
+
+  if (priceCheckState().running) {
+    return { error: "A check is already running. Reload in a minute to see what it found." };
+  }
+
+  runPriceChecks(10).catch((error) => console.error("[price-checks] manual batch failed:", error));
+  return {
+    ok: true,
+    message: "Checking up to 10 due links in the background. Reload in a minute to see what it found.",
+  };
 }

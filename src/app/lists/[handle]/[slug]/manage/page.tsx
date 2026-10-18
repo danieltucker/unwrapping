@@ -16,6 +16,7 @@ import { items } from "@/db/schema";
 import { getOwnerItemStatus, getOwnerStats } from "@/lib/claims";
 import { fundingForList } from "@/lib/contributions";
 import { allCategories } from "@/lib/guides";
+import { linkInfo } from "@/lib/price-checks";
 import {
   formatEventDate,
   formatShortDate,
@@ -78,6 +79,8 @@ export default async function EditorPage({
     guide ? allCategories() : Promise.resolve([]),
   ]);
   const category = categoryRows.find((row) => row.id === list.categoryId) ?? null;
+  // Price moves and dead links from the monthly recheck.
+  const links = await linkInfo(gifts);
 
   const short = routes.shortLink(list);
   const shareUrl = `${origin}${short ?? routes.publicList(list, ownerHandle)}`;
@@ -95,6 +98,7 @@ export default async function EditorPage({
     // Null on a surprise list: the row is not allowed to know.
     claimedCount: status?.get(gift.id)?.claimedCount ?? (status ? 0 : null),
     boughtCount: status?.get(gift.id)?.boughtCount ?? (status ? 0 : null),
+    link: links.get(gift.id) ?? null,
     // Filled in below for ideas; nothing else can hold a gift.
     children: [],
   });

@@ -38,6 +38,7 @@ Open http://localhost:3000.
 | `SESSION_SECRET` | Signs session and guest cookies. Any long random string. |
 | `SITE_URL` | The address this instance is served from, scheme and port included. Feeds canonical URLs, Open Graph tags, `robots.txt` and the sitemap, and decides whether cookies may be `Secure`. Defaults to `https://unwrapp.ing`, so set it anywhere else. See [`src/lib/origin.ts`](src/lib/origin.ts). |
 | `DB_AUTO_MIGRATE` | Apply pending migrations when the server starts. On in production, off in development. `0` to manage them yourself. |
+| `PRICE_CHECKS` | Recheck product links in the background, a batch an hour, each link about once a month. Shop prices follow the shop; typed prices never move. On in production, off in development. See [`src/lib/price-checks.ts`](src/lib/price-checks.ts). `PRICE_CHECK_BATCH` and `PRICE_CHECK_DAYS` tune it. |
 
 ## Deploying
 

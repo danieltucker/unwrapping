@@ -4,11 +4,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import {
+  checkLinksNow,
   deleteAccount,
   deleteCategory,
   deleteImage,
   deleteList,
 } from "@/app/admin/actions";
+import { AdminActionButton } from "@/components/admin-action-button";
 import { AdminDelete } from "@/components/admin-delete";
 import { CategoryForm, CategoryRow } from "@/components/category-form";
 import { Avatar, CapsLabel } from "@/components/ui";
@@ -16,6 +18,7 @@ import { db } from "@/db";
 import { items, lists, users } from "@/db/schema";
 import { requireAdmin } from "@/lib/admin";
 import { allCategories } from "@/lib/guides";
+import { linkHealth, priceCheckState } from "@/lib/price-checks";
 import { displayHost } from "@/lib/origin";
 import * as routes from "@/lib/routes";
 import { listUploads } from "@/lib/uploads";
@@ -45,8 +48,9 @@ export const metadata: Metadata = {
 export default async function AdminPage() {
   await requireAdmin();
 
-  const [categoryRows, accounts, allLists, uploads, photoOwners, avatarOwners] = await Promise.all([
+  const [categoryRows, links, accounts, allLists, uploads, photoOwners, avatarOwners] = await Promise.all([
     allCategories(),
+    linkHealth(),
 
     db.select().from(users).orderBy(desc(users.createdAt)).all(),
 
@@ -114,6 +118,7 @@ export default async function AdminPage() {
   }
 
   const orphans = uploads.filter((upload) => !usedBy.has(upload.url));
+  const checks = priceCheckState();
   const totalBytes = uploads.reduce((sum, upload) => sum + upload.bytes, 0);
 
   return (
@@ -146,6 +151,57 @@ export default async function AdminPage() {
               }
             />
           </CategoryRow>
+        ))}
+      </Section>
+
+      <Section
+        title="Product links that need a look"
+        count={links.problems.length}
+        note={`${links.checked} of ${links.tracked} links checked`}
+        empty="Nothing needs a look. Every rechecked link was readable, or not yet worth flagging."
+        before={
+          <div className="flex flex-col gap-2 rounded-card border border-ink-line bg-surface px-5 py-4">
+            <p className="text-xs leading-[1.6] text-ink-72">
+              Links are rechecked about once a month, a few an hour, and prices
+              that came from the shop follow it. Dead means the shop answered
+              404 or 410 twice running; unreadable means it turned us away
+              three times running, which big shops do to everyone and which says
+              nothing about the product.
+              {checks.lastRun
+                ? ` Last batch ${stamp(checks.lastRun)}: ${checks.lastSummary ?? "no summary"}`
+                : " No batch has run since this server started."}
+              {checks.running ? " A batch is running now." : ""}
+            </p>
+            <AdminActionButton
+              action={checkLinksNow}
+              label="Check due links now"
+              busyLabel="Starting…"
+            />
+          </div>
+        }
+      >
+        {links.problems.map((link) => (
+          <Row key={link.url}>
+            <div className="min-w-0 flex-1">
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="block truncate text-sm font-semibold text-violet hover:text-violet-hover"
+              >
+                {link.url}
+              </a>
+              <p className="mt-0.5 truncate text-xs text-ink-62">
+                <span className={`font-semibold ${link.dead ? "text-rose" : "text-amber"}`}>
+                  {link.dead
+                    ? `Dead · ${link.goneStreak} 404s running`
+                    : `Unreadable · ${link.failStreak} times running`}
+                </span>{" "}
+                · {plural(link.giftCount, "gift")} · last {link.detail ?? link.status},{" "}
+                {stamp(link.checkedAt)}
+              </p>
+            </div>
+          </Row>
         ))}
       </Section>
 

@@ -16,5 +16,5 @@ export {
   parsePriceToCents,
 } from "@/lib/scrape-parse";
 
-export { scrapeProduct } from "@/lib/scrape-fetch";
+export { scrapeProduct, scrapeProductWithTrace } from "@/lib/scrape-fetch";
 export type { ScrapeOutcome, ScrapeResult, ScrapeTrace } from "@/lib/scrape-fetch";

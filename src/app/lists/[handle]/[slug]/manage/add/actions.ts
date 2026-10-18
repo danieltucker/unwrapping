@@ -8,6 +8,7 @@ import { items, type ItemKind } from "@/db/schema";
 import { parseGiftEmoji } from "@/lib/emoji";
 import { requireOwnedList } from "@/lib/list-access";
 import { sourceDomain } from "@/lib/outbound";
+import { recordPrice } from "@/lib/price-checks";
 import * as routes from "@/lib/routes";
 import { parsePriceToCents, scrapeProduct, type ScrapeResult } from "@/lib/scrape";
 
@@ -101,6 +102,18 @@ export async function addGift(
     return { error: "That price didn't look like a number." };
   }
 
+  // The shop's figure if the box still holds what the scrape put there, the
+  // owner's own if they changed it. Only the shop's is kept up to date by the
+  // monthly recheck; see src/lib/price-checks.ts.
+  const scraped = String(formData.get("scrapedPrice") ?? "");
+  const priceSource =
+    priceCents === null
+      ? null
+      : url && scraped !== "" && Number(scraped) === priceCents
+        ? ("scrape" as const)
+        : ("owner" as const);
+  const currency = String(formData.get("currency") ?? "USD").toUpperCase();
+
   // Money has no quantity, and an idea has no units to run out of.
   const quantity =
     kind === "thing" && !guide
@@ -171,7 +184,8 @@ export async function addGift(
     selectedImageIndex,
     emoji,
     priceCents,
-    currency: String(formData.get("currency") ?? "USD").toUpperCase(),
+    priceSource,
+    currency,
     quantity,
     reason: String(formData.get("reason") ?? "").trim() || null,
     isMostWanted: formData.get("isMostWanted") === "on",
@@ -184,6 +198,9 @@ export async function addGift(
     needsAttention:
       kind === "thing" && images.length === 0 && !emoji ? "no-photo" : null,
   });
+
+  // The first entry in this link's price history, if it has none yet.
+  if (priceSource === "scrape") await recordPrice(url, priceCents, currency);
 
   revalidatePath(routes.manageList(list, ownerHandle));
   revalidatePath(routes.publicList(list, ownerHandle));

@@ -135,6 +135,9 @@ export function copyGifts(
     selectedImageIndex: row.selectedImageIndex,
     emoji: row.emoji,
     priceCents: row.priceCents,
+    // A shop price stays a shop price on the copy, so the recheck keeps it
+    // fresh there too; a typed one stays typed.
+    priceSource: row.priceSource,
     currency: row.currency,
     quantity: intoGuide ? 1 : row.quantity,
     reason: keepReasons ? row.reason : null,

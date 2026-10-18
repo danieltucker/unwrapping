@@ -10,6 +10,7 @@ import { useIsGuide } from "@/components/list-kind";
 import type { IdeaOption, MovableGift } from "@/components/move-into-idea";
 import { fundingLine } from "@/lib/funding";
 import { formatPrice } from "@/config/site";
+import type { LinkInfo } from "@/lib/price-checks";
 import type { Item } from "@/db/schema";
 
 export type EditorRow = {
@@ -23,6 +24,8 @@ export type EditorRow = {
   /** Null on a surprise list, where the owner may not know. Never 0 by accident. */
   claimedCount: number | null;
   boughtCount: number | null;
+  /** What the monthly recheck found: a price move, or a dead link. Null for neither. */
+  link: LinkInfo | null;
   /**
    * The presents hung under this idea, in the owner's order. Empty for
    * everything else: only an idea can hold gifts. See the items table.
@@ -433,6 +436,13 @@ function GiftRow({
             {row.item.quantity > 1 ? (
               <Badge tone="neutral">Qty {row.item.quantity}</Badge>
             ) : null}
+            {row.link?.wasCents != null && row.item.priceCents !== null ? (
+              <Badge tone={row.item.priceCents < row.link.wasCents ? "pine" : "neutral"}>
+                {row.item.priceCents < row.link.wasCents ? "↓" : "↑"}{" "}
+                {formatPrice(Math.abs(row.item.priceCents - row.link.wasCents))} since added
+              </Badge>
+            ) : null}
+            {row.link?.dead ? <Badge tone="amber">Link looks dead</Badge> : null}
             <ClaimBadge row={row} />
           </div>
 
@@ -562,7 +572,7 @@ function Badge({
   tone,
   children,
 }: {
-  tone: "violet" | "rose" | "neutral" | "pine";
+  tone: "violet" | "rose" | "neutral" | "pine" | "amber";
   children: React.ReactNode;
 }) {
   const tones = {
@@ -570,6 +580,7 @@ function Badge({
     rose: "bg-rose/10 text-rose-dark",
     neutral: "bg-ink/[.07] text-ink-72",
     pine: "bg-pine/10 text-pine-dark",
+    amber: "bg-amber/10 text-amber-dark",
   } as const;
 
   return (

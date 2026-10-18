@@ -394,6 +394,9 @@ function ConfirmGift({
         <input type="hidden" name="images" value={JSON.stringify(images)} />
         <input type="hidden" name="selectedImageIndex" value={selected} />
         <input type="hidden" name="currency" value={result.currency ?? "USD"} />
+        {/* What the shop said, so the server can tell a price left alone from
+            one the owner typed over. See priceSource on the items table. */}
+        <input type="hidden" name="scrapedPrice" value={result.priceCents ?? ""} />
         <input type="hidden" name="kind" value={kind} />
         {parentId ? <input type="hidden" name="parentId" value={parentId} /> : null}
         {cash ? <input type="hidden" name="isGroupGift" value="on" /> : null}
