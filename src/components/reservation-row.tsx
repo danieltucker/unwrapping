@@ -8,6 +8,7 @@ import { ReleaseButton } from "@/components/reserve-dialog";
 import { Button } from "@/components/ui";
 import { formatPrice } from "@/config/site";
 import type { Reservation } from "@/lib/reservations";
+import { placed } from "@/lib/tracking-flag";
 
 export function ReservationRow({
   reservation,
@@ -76,11 +77,11 @@ export function ReservationRow({
         <p className="mb-[13px] text-xs text-ink-72">
           {reservation.kind === "idea" ? "You took this on" : "Reserved by you"} on{" "}
           {reservedOn}
-          {reservation.href ? (
+          {reservation.buyHref ? (
             <>
               {" · "}
               <a
-                href={reservation.href}
+                href={placed(reservation.buyHref, "domain")}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
                 className="font-medium text-violet hover:text-violet-hover"

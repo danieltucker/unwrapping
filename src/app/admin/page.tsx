@@ -21,6 +21,7 @@ import {
   type GalleryPerson,
   type GalleryPhoto,
 } from "@/components/admin-photo-gallery";
+import { AdminTracking } from "@/components/admin-tracking";
 import { CategoryForm, CategoryRow } from "@/components/category-form";
 import { Avatar, CapsLabel } from "@/components/ui";
 import { db } from "@/db";
@@ -39,6 +40,7 @@ import { linkHealth, priceCheckState } from "@/lib/price-checks";
 import { displayHost } from "@/lib/origin";
 import * as routes from "@/lib/routes";
 import { openReports } from "@/lib/secret-santa";
+import { trackingOverview } from "@/lib/tracking-stats";
 import { listUploads, type StoredUpload } from "@/lib/uploads";
 
 export const metadata: Metadata = {
@@ -66,7 +68,7 @@ export const metadata: Metadata = {
 export default async function AdminPage() {
   const me = await requireAdmin();
 
-  const [categoryRows, links, accounts, allLists, uploads, photoOwners, uploadRows, reports, santaEvents] = await Promise.all([
+  const [categoryRows, links, accounts, allLists, uploads, photoOwners, uploadRows, reports, santaEvents, tracking] = await Promise.all([
     allCategories(),
     linkHealth(),
 
@@ -105,6 +107,7 @@ export default async function AdminPage() {
 
     openReports(),
     eventCounts(),
+    trackingOverview(),
   ]);
 
   /**
@@ -236,6 +239,18 @@ export default async function AdminPage() {
             </div>
           ))}
         </dl>
+      </Section>
+
+      <Section
+        title="Tracking"
+        count={tracking.total}
+        note="Ids and counts only · 30 days"
+        empty=""
+        bare
+        // The switch and the status line have to show before the first event does.
+        always
+      >
+        <AdminTracking overview={tracking} />
       </Section>
 
       <Section
@@ -595,6 +610,7 @@ function Section({
   note,
   before,
   bare = false,
+  always = false,
   children,
 }: {
   title: string;
@@ -607,6 +623,8 @@ function Section({
   before?: ReactNode;
   /** The children lay themselves out, rather than being rows in a list. */
   bare?: boolean;
+  /** Shows the children even at a count of zero, for a section that explains its own emptiness. */
+  always?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -623,7 +641,7 @@ function Section({
 
       {before ? <div className="mb-2.5">{before}</div> : null}
 
-      {count === 0 ? (
+      {count === 0 && !always ? (
         <p className="rounded-card border border-dashed border-ink-line-strong px-6 py-10 text-center text-sm text-ink-72">
           {empty}
         </p>

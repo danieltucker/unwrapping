@@ -3,6 +3,7 @@ import { ChipInDialog } from "@/components/chip-in-dialog";
 import { CopyItemButton } from "@/components/copy-dialog";
 import { FundingBar } from "@/components/funding";
 import { PriceChange } from "@/components/price-change";
+import { ItemImpression } from "@/components/tracking";
 import { fundingLine, isFullyFunded } from "@/lib/funding";
 import {
   BoughtButton,
@@ -12,6 +13,7 @@ import {
 import { formatPrice } from "@/config/site";
 import type { PublicItem } from "@/lib/claims";
 import type { ClaimRule } from "@/db/schema";
+import { placed } from "@/lib/tracking-flag";
 import { visibility } from "@/lib/visibility";
 
 /**
@@ -60,12 +62,13 @@ export function GiftCard({
 
   return (
     <li className="flex flex-col overflow-hidden rounded-card border border-ink-line bg-surface">
+      <ItemImpression itemId={item.id} />
       <CardPhoto
         image={item.image}
         emoji={item.emoji}
         fallback="No photo for this one"
         dimmed={settled}
-        href={item.href}
+        href={item.buyHref && placed(item.buyHref, "photo")}
       />
 
       <div className={`h-1 ${band}`} aria-hidden="true" />
@@ -79,14 +82,14 @@ export function GiftCard({
               settled ? "text-ink/62" : ""
             }`}
           >
-            {item.href ? (
+            {item.buyHref ? (
               // The one link on the card that carries the gift's name, so it is
               // the one the photo above defers to. No colour change: the title
               // is already the loudest thing here, and turning every card's
               // heading violet would leave nothing for the actions to stand out
               // against. The underline on hover is what says it is a link.
               <a
-                href={item.href}
+                href={placed(item.buyHref, "title")}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
                 className="hover:underline focus-ring"
@@ -142,9 +145,9 @@ export function GiftCard({
           />
         </p>
 
-        {item.href ? (
+        {item.buyHref ? (
           <a
-            href={item.href}
+            href={placed(item.buyHref, "domain")}
             target="_blank"
             rel="noopener noreferrer nofollow"
             // The line of text is 16px tall, which is a poor thing to ask a

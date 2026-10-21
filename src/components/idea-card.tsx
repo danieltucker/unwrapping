@@ -1,10 +1,12 @@
 import { CardPhoto } from "@/components/card-photo";
 import { CopyItemButton } from "@/components/copy-dialog";
 import { BoughtButton, ReleaseButton, ReserveDialog } from "@/components/reserve-dialog";
+import { ItemImpression } from "@/components/tracking";
 import { formatPrice } from "@/config/site";
 import type { ClaimRule } from "@/db/schema";
 import type { PublicItem } from "@/lib/claims";
 import { isStillOpen } from "@/lib/funding";
+import { placed } from "@/lib/tracking-flag";
 
 /**
  * An idea on the public list: "knitting", "Xbox games".
@@ -47,6 +49,7 @@ export function IdeaCard({
 }) {
   return (
     <li className="flex flex-col overflow-hidden rounded-card border border-ink-line bg-surface">
+      <ItemImpression itemId={item.id} />
       <CardPhoto
         image={item.image}
         emoji={item.emoji}
@@ -233,6 +236,7 @@ function SuggestionRow({
             : "border-ink-line bg-surface"
       }`}
     >
+      <ItemImpression itemId={item.id} />
       <span
         className={`flex h-[38px] w-[32px] shrink-0 items-center justify-center overflow-hidden rounded-[6px] bg-ink/[.05] ${
           gone ? "opacity-55" : ""
@@ -249,9 +253,9 @@ function SuggestionRow({
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-semibold leading-[1.35]">
           {/* The link is the title itself, the way it is on a gift card. */}
-          {item.href ? (
+          {item.buyHref ? (
             <a
-              href={item.href}
+              href={placed(item.buyHref, "child")}
               target="_blank"
               rel="noopener noreferrer nofollow"
               className="underline-offset-2 hover:underline focus-ring"

@@ -400,7 +400,7 @@ async function GiftGuides() {
 
       <GuideGrid>
         {guides.map((guide) => (
-          <GuideTile key={guide.id} guide={guide} />
+          <GuideTile key={guide.id} guide={guide} surface="home" />
         ))}
       </GuideGrid>
 

@@ -3,10 +3,12 @@
 import { useState } from "react";
 
 import { GiftCard } from "@/components/gift-card";
+import { useTrackingScope } from "@/components/tracking";
 import { formatPrice } from "@/config/site";
 import type { ClaimRule } from "@/db/schema";
 import type { PublicItem } from "@/lib/claims";
 import { isStillOpen } from "@/lib/funding";
+import { track } from "@/lib/track";
 
 /** The price the "under" filter draws its line at. */
 const AFFORDABLE_CENTS = 5000;
@@ -45,6 +47,17 @@ export function GiftGrid({
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("owner");
+  // Which controls get used, never what was on screen when they were.
+  const scope = useTrackingScope();
+
+  const chooseFilter = (key: Filter) => {
+    setFilter(key);
+    if (scope && key !== filter) track("filter_used", { listId: scope.listId, props: { filter: key } });
+  };
+  const chooseSort = (key: Sort) => {
+    setSort(key);
+    if (scope && key !== sort) track("sort_used", { listId: scope.listId, props: { sort: key } });
+  };
 
   const labels: Record<Filter, string> = {
     all: "All",
@@ -83,7 +96,7 @@ export function GiftGrid({
             <button
               key={key}
               type="button"
-              onClick={() => setFilter(key)}
+              onClick={() => chooseFilter(key)}
               aria-pressed={filter === key}
               className={`rounded-pill px-[13px] py-[7px] text-xs font-semibold transition-colors duration-150 ${
                 filter === key
@@ -101,7 +114,7 @@ export function GiftGrid({
             <span>Sort</span>
             <select
               value={sort}
-              onChange={(event) => setSort(event.target.value as Sort)}
+              onChange={(event) => chooseSort(event.target.value as Sort)}
               className="rounded-control border border-ink-line-strong bg-surface px-[10px] py-[6px] text-xs font-semibold text-ink-72 focus-ring"
             >
               <option value="owner">The list&rsquo;s own order</option>

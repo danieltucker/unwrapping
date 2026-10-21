@@ -19,6 +19,7 @@ import { resolveList, viewerOwns, type ResolvedList } from "@/lib/list-access";
 import { isSantaFor } from "@/lib/secret-santa";
 import { manageList, publicList } from "@/lib/routes";
 import { setItemBought } from "@/lib/reservations";
+import { recordServerEvent } from "@/lib/tracking";
 import { parsePriceToCents } from "@/lib/scrape-parse";
 import {
   ensureGuestToken,
@@ -102,6 +103,10 @@ export async function reserveGift(
   if (outcome !== "claimed") {
     return { error: (item.kind === "idea" ? IDEA_MESSAGES : MESSAGES)[outcome] };
   }
+
+  // That a gift on this list was taken, never by whom: the row carries the
+  // same random ids as any other event, and nothing from the claim itself.
+  await recordServerEvent({ type: "item_claim", list: resolved.list, item });
 
   refreshList(resolved);
   return { ok: true };

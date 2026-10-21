@@ -17,6 +17,7 @@ import { adminOrNull, isAdmin, isAdminEmail } from "@/lib/admin";
 import { priceCheckState, runPriceChecks } from "@/lib/price-checks";
 import * as routes from "@/lib/routes";
 import { slugify } from "@/lib/slug";
+import { isTrackingPaused, setTrackingPaused } from "@/lib/tracking";
 import { deleteUpload } from "@/lib/uploads";
 
 /**
@@ -450,4 +451,22 @@ export async function removeReportedMessage(
 
   revalidatePath(routes.admin);
   return { ok: true, message: "Removed from the thread." };
+}
+
+/**
+ * Stops event tracking from writing anything, or starts it again, without a
+ * deploy. Links keep going through /go and on to the shop either way; only
+ * the recording stops. Takes effect within a few seconds: see isTrackingPaused.
+ */
+export async function toggleTrackingPaused(): Promise<AdminState> {
+  const admin = await adminOrNull();
+  if (!admin) return { error: NOT_ADMIN };
+
+  const paused = !(await isTrackingPaused());
+  await setTrackingPaused(paused);
+  revalidatePath(routes.admin);
+  return {
+    ok: true,
+    message: paused ? "Paused. Nothing is being recorded." : "Recording again.",
+  };
 }

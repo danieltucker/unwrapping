@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -662,6 +663,100 @@ export const analyticsEvents = sqliteTable(
   },
   (t) => [index("analytics_events_event_idx").on(t.event, t.createdAt)],
 );
+
+/* -------------------------------------------------------------------------- */
+/* Event tracking                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Every kind of row item_events can hold. Text in the column, like items.kind,
+ * so adding one needs no migration. Which of them a browser may send, and with
+ * what, is decided in src/lib/event-validation.ts; outbound_click and
+ * item_claim are only ever written by the server.
+ */
+export const ITEM_EVENT_TYPES = [
+  "list_view",
+  "idea_expand",
+  "item_impression",
+  "outbound_click",
+  "filter_used",
+  "sort_used",
+  "suggestion_impression",
+  "suggestion_click",
+  "item_claim",
+] as const;
+export type ItemEventType = (typeof ITEM_EVENT_TYPES)[number];
+
+/**
+ * What happens on lists, for the operator: views, impressions, clicks out to
+ * shops. See src/lib/tracking.ts, which is the only thing that writes here.
+ *
+ * Nothing in a row says who anybody is. The visitor and session ids are random
+ * values from first-party cookies (13 months and 30 idle minutes at most) and
+ * are joined to nothing; there is no account, email, IP address or user agent,
+ * only whether the user agent looked like a bot. Keep it that way: anything
+ * added here must not be able to identify a person.
+ *
+ * Deleting a list or a gift deletes its events with it. Rows older than 13
+ * months are deleted daily; see src/lib/event-retention.ts.
+ */
+export const itemEvents = sqliteTable(
+  "item_events",
+  {
+    // An integer rather than a UUID: the live feed reads the newest rows, and
+    // rowid order is insertion order for free.
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    occurredAt: integer("occurred_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    eventType: text("event_type", { enum: ITEM_EVENT_TYPES }).notNull(),
+    visitorId: text("visitor_id"),
+    sessionId: text("session_id"),
+    listId: text("list_id").references(() => lists.id, { onDelete: "cascade" }),
+    itemId: text("item_id").references(() => items.id, { onDelete: "cascade" }),
+    /** The idea the event is about: the idea itself, or the one a gift sits under. */
+    ideaId: text("idea_id").references(() => items.id, { onDelete: "cascade" }),
+    properties: text("properties", { mode: "json" })
+      .$type<Record<string, string | number | boolean>>()
+      .notNull()
+      .default(sql`'{}'`),
+    isBot: integer("is_bot", { mode: "boolean" }).notNull().default(false),
+  },
+  (t) => [
+    index("item_events_type_idx").on(t.eventType, t.occurredAt),
+    index("item_events_item_idx").on(t.itemId, t.occurredAt),
+    index("item_events_list_idx").on(t.listId, t.occurredAt),
+  ],
+);
+
+/**
+ * Events that were sent and not stored, counted per day and reason: refused
+ * (malformed, too large, rate limited) or deliberately skipped (Do Not Track,
+ * the list's owner, tracking paused). Counts only, for the admin screen, so
+ * "is it working" can be answered without storing what was turned away.
+ */
+export const itemEventDrops = sqliteTable(
+  "item_event_drops",
+  {
+    /** YYYY-MM-DD, UTC. */
+    day: text("day").notNull(),
+    reason: text("reason").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.reason] })],
+);
+
+/**
+ * Switches the operator flips from /admin without a deploy. One row per key;
+ * a missing row means the default. Today only `tracking_paused`.
+ */
+export const appSettings = sqliteTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
 
 export type User = typeof users.$inferSelect;
 export type Category = typeof categories.$inferSelect;

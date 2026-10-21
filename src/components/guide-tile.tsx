@@ -1,6 +1,8 @@
 import Link from "next/link";
 
+import { SuggestionTracker } from "@/components/tracking";
 import type { GuideSummary } from "@/lib/guides";
+import { trackingEnabled } from "@/lib/tracking-flag";
 
 /**
  * One gift guide on a browse page: /gifts, a category's shelf, the homepage.
@@ -11,15 +13,19 @@ import type { GuideSummary } from "@/lib/guides";
 export function GuideTile({
   guide,
   showCategory = true,
+  surface,
 }: {
   guide: GuideSummary;
   /** Off on a category's own page, where every tile would say the same thing. */
   showCategory?: boolean;
+  /** Which browse page this is, for suggestion_impression and suggestion_click. */
+  surface: "home" | "gifts" | "category";
 }) {
   const slots = [0, 1, 2].map((index) => guide.previews[index] ?? null);
 
   return (
     <li>
+      {trackingEnabled() ? <SuggestionTracker listId={guide.id} surface={surface} /> : null}
       <Link
         href={guide.href}
         className="group flex h-full flex-col overflow-hidden rounded-card border border-ink-line bg-surface transition-colors duration-150 hover:border-violet-edge focus-ring"

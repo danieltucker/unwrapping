@@ -17,6 +17,7 @@ import { resolveList, viewerOwns } from "@/lib/list-access";
 import { readGuestToken } from "@/lib/session";
 import { viewerScope } from "@/lib/viewer";
 import { outboundHref } from "@/lib/outbound";
+import { buyLink } from "@/lib/tracking-flag";
 import { linkInfo } from "@/lib/price-checks";
 
 export type PublicItem = {
@@ -34,7 +35,13 @@ export type PublicItem = {
    */
   parentId: string | null;
   title: string;
+  /**
+   * The shop's page, tagged. Read for the referral disclosure, which has to
+   * know what the links on the page really are; never rendered as a link.
+   */
   href: string | null;
+  /** What a buy button links to: /go/<id> while tracking is on, else href. See buyLink. */
+  buyHref: string | null;
   sourceDomain: string | null;
   image: string | null;
   /** Stands in for the photo when there is none. */
@@ -173,6 +180,7 @@ export async function getPublicList(
     : [];
 
   const publicItems: PublicItem[] = rows.map((item) => {
+    const href = outboundHref(item.url, "web", { replaceTags: list.kind === "guide" });
     const itemClaims = liveClaims.filter((claim) => claim.itemId === item.id);
     const claimedCount = itemClaims.length;
     const viewerClaim =
@@ -185,7 +193,8 @@ export async function getPublicList(
       kind: item.kind,
       parentId: item.parentId,
       title: item.title,
-      href: outboundHref(item.url, "web", { replaceTags: list.kind === "guide" }),
+      href,
+      buyHref: buyLink(item.id, href, list.kind === "guide" ? "guide" : "list"),
       sourceDomain: item.sourceDomain,
       image: item.images[item.selectedImageIndex] ?? item.images[0] ?? null,
       emoji: item.emoji,

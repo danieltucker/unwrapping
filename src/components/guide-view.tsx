@@ -4,11 +4,13 @@ import { CardPhoto } from "@/components/card-photo";
 import { CopyItemButton, CopyListButton } from "@/components/copy-dialog";
 import { PriceChange } from "@/components/price-change";
 import { ReferralDisclosure } from "@/components/referral-disclosure";
+import { ItemImpression } from "@/components/tracking";
 import { Avatar, EyeOffIcon } from "@/components/ui";
 import { formatPrice } from "@/config/site";
 import type { Category, List } from "@/db/schema";
 import type { PublicItem } from "@/lib/claims";
 import * as routes from "@/lib/routes";
+import { placed } from "@/lib/tracking-flag";
 
 /**
  * A gift guide as anyone sees it: gift ideas for a kind of person, by someone
@@ -192,11 +194,12 @@ export function GuideView({
 function GuideGiftCard({ item }: { item: PublicItem }) {
   return (
     <li className="flex flex-col overflow-hidden rounded-card border border-ink-line bg-surface">
+      <ItemImpression itemId={item.id} />
       <CardPhoto
         image={item.image}
         emoji={item.emoji}
         fallback="No photo for this one"
-        href={item.href}
+        href={item.buyHref && placed(item.buyHref, "photo")}
       />
       {/* Violet for a top pick, the same band "most wanted" uses on a wishlist,
           with the pill below saying so in words. */}
@@ -211,9 +214,9 @@ function GuideGiftCard({ item }: { item: PublicItem }) {
 
         <div className="mb-[7px] flex items-baseline justify-between gap-3">
           <h3 className="text-lg font-semibold leading-[1.25] tracking-[-.2px]">
-            {item.href ? (
+            {item.buyHref ? (
               <a
-                href={item.href}
+                href={placed(item.buyHref, "title")}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
                 className="hover:underline focus-ring"
@@ -239,9 +242,9 @@ function GuideGiftCard({ item }: { item: PublicItem }) {
 
         <p className="mb-[14px] flex-1 text-sm leading-[1.65] text-ink-76">{item.reason}</p>
 
-        {item.href ? (
+        {item.buyHref ? (
           <a
-            href={item.href}
+            href={placed(item.buyHref, "button")}
             target="_blank"
             rel="noopener noreferrer nofollow"
             className="block w-full rounded-pill border border-violet/45 py-3 text-center text-sm font-semibold text-violet transition-colors duration-150 hover:bg-violet-wash"
@@ -269,6 +272,7 @@ function GuideIdeaCard({
 }) {
   return (
     <li className="flex flex-col overflow-hidden rounded-card border border-ink-line bg-surface">
+      <ItemImpression itemId={item.id} />
       <CardPhoto
         image={item.image}
         emoji={item.emoji}
@@ -301,6 +305,7 @@ function GuideIdeaCard({
                   key={suggestion.id}
                   className="flex items-center gap-[10px] rounded-[9px] border border-ink-line bg-surface px-[9px] py-2"
                 >
+                  <ItemImpression itemId={suggestion.id} />
                   <span className="flex h-[38px] w-[32px] shrink-0 items-center justify-center overflow-hidden rounded-[6px] bg-ink/[.05]">
                     {suggestion.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -311,9 +316,9 @@ function GuideIdeaCard({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-semibold leading-[1.35]">
-                      {suggestion.href ? (
+                      {suggestion.buyHref ? (
                         <a
-                          href={suggestion.href}
+                          href={placed(suggestion.buyHref, "child")}
                           target="_blank"
                           rel="noopener noreferrer nofollow"
                           className="underline-offset-2 hover:underline focus-ring"

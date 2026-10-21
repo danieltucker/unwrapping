@@ -11,6 +11,7 @@ import {
   type ItemKind,
 } from "@/db/schema";
 import { outboundHref } from "@/lib/outbound";
+import { buyLink } from "@/lib/tracking-flag";
 import { publicList } from "@/lib/routes";
 import { viewerScope } from "@/lib/viewer";
 
@@ -114,6 +115,8 @@ export type GuestContribution = {
   title: string;
   image: string | null;
   href: string | null;
+  /** What the shop link renders as; see buyLink. */
+  buyHref: string | null;
   sourceDomain: string | null;
   /** Everything this person has put in, summed; they may have chipped in twice. */
   yourAmountCents: number;
@@ -166,12 +169,14 @@ export async function getGuestContributions(): Promise<GuestContribution[]> {
       continue;
     }
 
+    const href = outboundHref(item.url);
     byItem.set(item.id, {
       itemId: item.id,
       kind: item.kind,
       title: item.title,
       image: item.images[item.selectedImageIndex] ?? item.images[0] ?? null,
-      href: outboundHref(item.url),
+      href,
+      buyHref: buyLink(item.id, href, "contributions"),
       sourceDomain: item.sourceDomain,
       yourAmountCents: amountCents,
       raisedCents: 0,

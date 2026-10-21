@@ -51,7 +51,7 @@ export default async function GiftGuidesPage() {
             <h2 className="mb-4 text-lg font-semibold tracking-[-.2px]">Popular gift lists</h2>
             <GuideGrid>
               {popular.map((guide) => (
-                <GuideTile key={guide.id} guide={guide} />
+                <GuideTile key={guide.id} guide={guide} surface="gifts" />
               ))}
             </GuideGrid>
           </section>
@@ -62,7 +62,7 @@ export default async function GiftGuidesPage() {
             <h2 className="mb-4 text-lg font-semibold tracking-[-.2px]">Just added</h2>
             <GuideGrid>
               {fresh.map((guide) => (
-                <GuideTile key={guide.id} guide={guide} />
+                <GuideTile key={guide.id} guide={guide} surface="gifts" />
               ))}
             </GuideGrid>
           </section>

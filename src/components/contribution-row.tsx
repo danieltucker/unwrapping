@@ -4,6 +4,7 @@ import { FundingBar } from "@/components/funding";
 import { fundingLine, isFullyFunded } from "@/lib/funding";
 import { formatPrice } from "@/config/site";
 import type { GuestContribution } from "@/lib/contributions";
+import { placed } from "@/lib/tracking-flag";
 
 /**
  * A group gift this person has put money toward.
@@ -70,11 +71,11 @@ export function ContributionRow({
 
         <p className="text-xs text-ink-72">
           Last chipped in on {chippedOn}
-          {contribution.href ? (
+          {contribution.buyHref ? (
             <>
               {" · "}
               <a
-                href={contribution.href}
+                href={placed(contribution.buyHref, "domain")}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
                 className="font-medium text-violet hover:text-violet-hover"

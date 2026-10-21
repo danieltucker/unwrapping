@@ -54,7 +54,7 @@ export default async function GiftCategoryPage({ params }: PageProps<"/gifts/[ca
           <div className="mt-8">
             <GuideGrid>
               {guides.map((guide) => (
-                <GuideTile key={guide.id} guide={guide} showCategory={false} />
+                <GuideTile key={guide.id} guide={guide} showCategory={false} surface="category" />
               ))}
             </GuideGrid>
           </div>

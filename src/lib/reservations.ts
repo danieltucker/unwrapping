@@ -5,6 +5,7 @@ import { and, eq, isNull, ne, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { claims, items, lists, users, type ItemKind } from "@/db/schema";
 import { outboundHref } from "@/lib/outbound";
+import { buyLink } from "@/lib/tracking-flag";
 import { listSegments, publicList } from "@/lib/routes";
 import { viewerScope } from "@/lib/viewer";
 
@@ -17,6 +18,8 @@ export type Reservation = {
   priceCents: number | null;
   image: string | null;
   href: string | null;
+  /** What the shop link renders as; see buyLink. */
+  buyHref: string | null;
   sourceDomain: string | null;
   claimedAt: Date;
   markedBought: boolean;
@@ -91,6 +94,7 @@ export async function getGuestReservations(): Promise<{
 
   const reservations: Reservation[] = rows.map(({ claim, item, list, handle }) => {
     const [segmentHandle, segmentKey] = listSegments(list, handle);
+    const href = outboundHref(item.url);
 
     return {
       claimId: claim.id,
@@ -99,7 +103,8 @@ export async function getGuestReservations(): Promise<{
       title: item.title,
       priceCents: item.priceCents,
       image: item.images[item.selectedImageIndex] ?? item.images[0] ?? null,
-      href: outboundHref(item.url),
+      href,
+      buyHref: buyLink(item.id, href, "reserved"),
       sourceDomain: item.sourceDomain,
       claimedAt: claim.claimedAt,
       markedBought: claim.markedBought,
