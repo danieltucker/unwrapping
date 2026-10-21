@@ -151,6 +151,46 @@ export const readGuestToken = cache(async (): Promise<string | null> => {
   return signed ? verify(signed) : null;
 });
 
+/* -------------------------------------------------------------------------- */
+/* Secret Santa: one cookie per exchange, holding that person's private link   */
+/* -------------------------------------------------------------------------- */
+
+const SANTA_COOKIE_PREFIX = "unwrap_santa_";
+
+/**
+ * The raw token from this exchange's private link, if this browser has opened
+ * it. Not signed: the token is already a random secret, and only its hash is
+ * stored, so there is nothing a signature would add.
+ *
+ * A cookie per exchange rather than the guest cookie, because the private link
+ * is a bearer secret that has to be able to *replace* who this browser is in
+ * one exchange without disturbing its reservations anywhere else.
+ */
+export const readSantaToken = cache(async (code: string): Promise<string | null> => {
+  return (await cookies()).get(`${SANTA_COOKIE_PREFIX}${code}`)?.value ?? null;
+});
+
+/** Every exchange this browser holds a private link for, as [code, token]. */
+export const readSantaTokens = cache(async (): Promise<[string, string][]> => {
+  return (await cookies())
+    .getAll()
+    .filter((cookie) => cookie.name.startsWith(SANTA_COOKIE_PREFIX))
+    .map((cookie) => [cookie.name.slice(SANTA_COOKIE_PREFIX.length), cookie.value]);
+});
+
+/** Server Actions and Route Handlers only. */
+export async function setSantaToken(code: string, token: string): Promise<void> {
+  (await cookies()).set(`${SANTA_COOKIE_PREFIX}${code}`, token, {
+    ...cookieOptions,
+    expires: new Date(Date.now() + GUEST_DAYS * 86_400_000),
+  });
+}
+
+/** Server Actions and Route Handlers only. */
+export async function clearSantaToken(code: string): Promise<void> {
+  (await cookies()).delete(`${SANTA_COOKIE_PREFIX}${code}`);
+}
+
 /**
  * Issues a guest token if there isn't one. Only call this from a Server Action
  * or Route Handler; cookies cannot be set while rendering a page.

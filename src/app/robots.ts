@@ -44,7 +44,14 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   return {
     rules: {
       userAgent: "*",
-      allow: ["/$", `${routes.giftGuides}$`, `${routes.giftGuides}/`, ...guides.map((path) => `${path}$`)],
+      allow: [
+        "/$",
+        `${routes.giftGuides}$`,
+        `${routes.giftGuides}/`,
+        // The overview, anchored: every exchange beneath it stays disallowed.
+        `${routes.secretSanta}$`,
+        ...guides.map((path) => `${path}$`),
+      ],
       disallow: ["/", routes.newGiftGuide],
     },
     sitemap: `${origin}/sitemap.xml`,

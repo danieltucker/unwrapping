@@ -10,9 +10,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:parse && npm run test:handles",
+    "test": "npm run test:parse && npm run test:handles && npm run test:santa",
     "test:parse": "node scripts/test-parse.mts",
     "test:handles": "node scripts/test-handles.mts",
+    "test:santa": "node scripts/test-santa.mts",
     "check": "npm run typecheck && npm run lint && npm test",
     "scrape": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/scrape-url.mts"
   },

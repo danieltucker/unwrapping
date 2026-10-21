@@ -85,6 +85,13 @@
       "when": 1792597359805,
       "tag": "0011_faulty_otto_octavius",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1792599524925,
+      "tag": "0012_steep_senator_kelly",
+      "breakpoints": true
     }
   ]
 }

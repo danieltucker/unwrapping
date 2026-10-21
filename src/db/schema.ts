@@ -441,9 +441,155 @@ export const uploads = sqliteTable("uploads", {
   createdAt: createdAt(),
 });
 
+/* -------------------------------------------------------------------------- */
+/* Secret Santa                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * "open" while people are joining; "drawn" once everyone has a name. Resetting
+ * the draw puts an exchange back to "open" and deletes its assignments, so the
+ * two states are all there is.
+ */
+export const SANTA_STATUSES = ["open", "drawn"] as const;
+export type SantaStatus = (typeof SANTA_STATUSES)[number];
+
+/**
+ * A Secret Santa: a group who each draw one other member to buy for.
+ *
+ * Nothing is emailed or texted. The organiser shares /secret-santa/<code> in
+ * whatever group chat the family already has, and each person who joins gets
+ * a private link of their own; see santaParticipants.tokenHash.
+ */
+export const santaExchanges = sqliteTable(
+  "santa_exchanges",
+  {
+    id: id(),
+    /** Always an account: the dashboard has to survive a cleared cookie. */
+    organizerId: text("organizer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * /secret-santa/<code> is the invite link, and the pages hanging off it are
+     * the dashboard and each participant's own. Knowing it lets you join while
+     * the exchange is open and nothing else: who drew whom is behind a
+     * participant's private link, and the dashboard behind the organiser's
+     * account.
+     */
+    code: text("code").notNull().unique(),
+    name: text("name").notNull(),
+    emoji: text("emoji").notNull().default("🎅"),
+    /** Integer cents in the site's currency, like every price. Null is "no limit set". */
+    budgetCents: integer("budget_cents"),
+    /** Local midnight, like a list's event date. */
+    exchangeDate: integer("exchange_date", { mode: "timestamp" }),
+    note: text("note"),
+    status: text("status", { enum: SANTA_STATUSES }).notNull().default("open"),
+    /** When the current draw was made. A participant who looked before this saw an older one. */
+    drawnAt: integer("drawn_at", { mode: "timestamp" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("santa_exchanges_organizer_idx").on(t.organizerId)],
+);
+
+/**
+ * One person in an exchange. Most have no account; they are known by a private
+ * link, /secret-santa/p/<token>, which this row stores only the hash of — the
+ * same rule as a session, so a leaked database can't be used to open anybody's
+ * draw. The link sets a cookie for this exchange, and from then on that browser
+ * is them.
+ */
+export const santaParticipants = sqliteTable(
+  "santa_participants",
+  {
+    id: id(),
+    exchangeId: text("exchange_id")
+      .notNull()
+      .references(() => santaExchanges.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    /**
+     * Set when they join while signed in, or ask for it from their page, so
+     * their draw follows them to any browser they sign into. Never set behind
+     * their back: a browser holding somebody else's link must not quietly
+     * attach that person to whoever is signed in there.
+     */
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    /** Their own Unwrap wishlist, for whoever draws them. */
+    wishlistId: text("wishlist_id").references(() => lists.id, {
+      onDelete: "set null",
+    }),
+    /**
+     * When they last pressed "show me who I've got". Earlier than the
+     * exchange's drawnAt means the names were drawn again since they looked.
+     * The organiser sees whether someone has looked, never what they saw.
+     */
+    viewedAt: integer("viewed_at", { mode: "timestamp" }),
+    /**
+     * When the organiser last replaced their private link. Whoever replaces a
+     * link can open it, so every reset is shown to the whole exchange; it is
+     * the only defence a link-only design has against an organiser peeking.
+     */
+    linkResetAt: integer("link_reset_at", { mode: "timestamp" }),
+    joinedAt: createdAt(),
+  },
+  (t) => [
+    index("santa_participants_exchange_idx").on(t.exchangeId),
+    // SQLite treats NULLs as distinct, so this only binds people with accounts.
+    uniqueIndex("santa_participants_exchange_user_idx").on(t.exchangeId, t.userId),
+  ],
+);
+
+/**
+ * Two people who must not draw each other, usually a couple. Symmetric, and
+ * stored once with the ids in sorted order so the same pair can't be added
+ * twice the other way round.
+ */
+export const santaExclusions = sqliteTable(
+  "santa_exclusions",
+  {
+    id: id(),
+    exchangeId: text("exchange_id")
+      .notNull()
+      .references(() => santaExchanges.id, { onDelete: "cascade" }),
+    firstId: text("first_id")
+      .notNull()
+      .references(() => santaParticipants.id, { onDelete: "cascade" }),
+    secondId: text("second_id")
+      .notNull()
+      .references(() => santaParticipants.id, { onDelete: "cascade" }),
+  },
+  (t) => [uniqueIndex("santa_exclusions_pair_idx").on(t.exchangeId, t.firstId, t.secondId)],
+);
+
+/**
+ * Who buys for whom. A table of its own, rather than a column on the
+ * participant, so that nothing which reads participants for the organiser's
+ * dashboard can carry an assignment along by accident. The one place this is
+ * read is assignmentFor in src/lib/secret-santa.ts.
+ */
+export const santaAssignments = sqliteTable(
+  "santa_assignments",
+  {
+    id: id(),
+    exchangeId: text("exchange_id")
+      .notNull()
+      .references(() => santaExchanges.id, { onDelete: "cascade" }),
+    giverId: text("giver_id")
+      .notNull()
+      .unique()
+      .references(() => santaParticipants.id, { onDelete: "cascade" }),
+    receiverId: text("receiver_id")
+      .notNull()
+      .references(() => santaParticipants.id, { onDelete: "cascade" }),
+  },
+  (t) => [uniqueIndex("santa_assignments_receiver_idx").on(t.exchangeId, t.receiverId)],
+);
+
 export type User = typeof users.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type List = typeof lists.$inferSelect;
 export type Item = typeof items.$inferSelect;
 export type Claim = typeof claims.$inferSelect;
 export type Contribution = typeof contributions.$inferSelect;
+export type SantaExchange = typeof santaExchanges.$inferSelect;
+export type SantaParticipant = typeof santaParticipants.$inferSelect;

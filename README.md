@@ -119,8 +119,16 @@ A few things worth knowing before you change them:
   one place later. Never render a raw `item.url`.
 - **Money is integer cents** everywhere. `formatPrice` in `src/config/site.ts`
   is the only place that renders it.
-- **Only public pages are indexable:** `/`, `/gifts` and its categories, and
-  each *published* gift guide. Every other page under `/lists` is `noindex`
+- **Secret Santa runs on links, not messages.** The organiser (who needs an
+  account) shares `/secret-santa/<code>`; each person joins with a name and gets
+  a private link, `/secret-santa/p/<token>`, stored only as a hash and
+  remembered in a cookie per exchange. Who drew whom lives in
+  `santa_assignments` and is read in exactly one place, `assignmentFor` in
+  [`src/lib/secret-santa.ts`](src/lib/secret-santa.ts); the organiser's
+  dashboard must never reach it. Replacing someone's lost link is shown to the
+  whole exchange, because whoever holds the new link can open their page.
+- **Only public pages are indexable:** `/`, `/gifts` and its categories,
+  `/secret-santa` (but nothing beneath it), and each *published* gift guide. Every other page under `/lists` is `noindex`
   through [`src/app/lists/layout.tsx`](src/app/lists/layout.tsx), and
   `robots.txt` allows published guides by their exact path. A wishlist is
   unlisted, not secret, so a crawler that found one would publish somebody's

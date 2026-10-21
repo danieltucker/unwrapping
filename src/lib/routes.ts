@@ -58,6 +58,27 @@ export function giftCategory(slug: string): string {
   return `/gifts/${slug}`;
 }
 
+/**
+ * Secret Santa. An exchange is addressed by its code, and the bare
+ * /secret-santa/<code> is the invite link the organiser shares.
+ */
+export const secretSanta = "/secret-santa";
+export const newSecretSanta = "/secret-santa/new";
+export function santaInvite(code: string): string {
+  return `/secret-santa/${code}`;
+}
+export function santaManage(code: string): string {
+  return `/secret-santa/${code}/manage`;
+}
+/** A participant's own page, once their browser knows who they are. */
+export function santaMine(code: string): string {
+  return `/secret-santa/${code}/me`;
+}
+/** The private link: sets the cookie, then lands on santaMine. */
+export function santaPrivateLink(token: string): string {
+  return `/secret-santa/p/${token}`;
+}
+
 export const signIn = "/sign-in";
 export const signUp = "/sign-up";
 export const newList = "/new";

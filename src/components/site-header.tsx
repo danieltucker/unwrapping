@@ -97,6 +97,7 @@ async function Identity() {
           reservedCount={reservedCount}
           listsHref={routes.myLists}
           profileHref={routes.profile}
+          secretSantaHref={routes.secretSanta}
           adminHref={isAdmin(user) ? routes.admin : null}
         />
       ) : (

@@ -33,6 +33,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.8,
     },
+    // The overview only. Every exchange under it is somebody's family.
+    {
+      url: `${origin}${routes.secretSanta}`,
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
     ...categories.map((category) => ({
       url: `${origin}${routes.giftCategory(category.slug)}`,
       changeFrequency: "weekly" as const,

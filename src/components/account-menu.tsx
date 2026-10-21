@@ -12,6 +12,7 @@ export function AccountMenu({
   reservedCount,
   listsHref,
   profileHref,
+  secretSantaHref,
   adminHref,
 }: {
   name: string;
@@ -20,6 +21,7 @@ export function AccountMenu({
   reservedCount: number;
   listsHref: string;
   profileHref: string;
+  secretSantaHref: string;
   /** Only set for whoever runs the instance; nobody else is offered the screen. */
   adminHref?: string | null;
 }) {
@@ -93,6 +95,15 @@ export function AccountMenu({
                 {reservedCount}
               </span>
             ) : null}
+          </Link>
+
+          <Link
+            href={secretSantaHref}
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-3 text-sm font-medium hover:bg-ink/[.03]"
+          >
+            Secret Santa
           </Link>
 
           <Link
