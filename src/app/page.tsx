@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { GuideGrid, GuideTile } from "@/components/guide-tile";
+import { SantaSeasonBanner } from "@/components/santa-season-banner";
 import { StartFromGiftForm } from "@/components/start-from-gift-form";
 import {
   BoxIcon,
@@ -48,6 +49,7 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <main className="mx-auto w-full max-w-[120rem] flex-1">
+      <SantaSeasonBanner />
       <Hero />
       <HowItWorks />
       <GiftGuides />

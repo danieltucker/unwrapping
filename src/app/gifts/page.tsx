@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 
 import { BrowseBanner, CategoryChips, MakeOneCta } from "@/components/gift-browse";
 import { GuideGrid, GuideTile } from "@/components/guide-tile";
+import { SantaSeasonBanner } from "@/components/santa-season-banner";
+import { ButtonLink } from "@/components/ui";
 import { site } from "@/config/site";
+import * as routes from "@/lib/routes";
 import { allCategories, publishedGuides } from "@/lib/guides";
 
 export const metadata: Metadata = {
@@ -28,6 +31,7 @@ export default async function GiftGuidesPage() {
 
   return (
     <main className="w-full flex-1">
+      <SantaSeasonBanner />
       <BrowseBanner
         eyebrow="Gift lists"
         title="Gift ideas for every kind of person"
@@ -63,8 +67,38 @@ export default async function GiftGuidesPage() {
           </section>
         ) : null}
 
+        <SecretSantaCard />
+
         <MakeOneCta />
       </div>
     </main>
+  );
+}
+
+/**
+ * The other thing people browsing for gift ideas are often in the middle of:
+ * a group where everyone buys for one person. Offered all year; the seasonal
+ * banner above is what gets louder in November and December.
+ */
+function SecretSantaCard() {
+  return (
+    <section
+      aria-labelledby="secret-santa"
+      className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-card border border-violet-edge bg-violet-wash px-6 py-5"
+    >
+      <div className="min-w-0 max-w-[36rem]">
+        <h2 id="secret-santa" className="mb-1 text-base font-semibold">
+          <span aria-hidden="true">🎅 </span>Drawing names this year?
+        </h2>
+        <p className="text-sm leading-relaxed text-ink-76">
+          Run your Secret Santa here. One link in the group chat, everyone joins with
+          their name, and each person sees only who they drew, with that person&rsquo;s
+          wishlist.
+        </p>
+      </div>
+      <ButtonLink href={routes.secretSanta} variant="outline">
+        Secret Santa
+      </ButtonLink>
+    </section>
   );
 }

@@ -484,8 +484,15 @@ export const santaExchanges = sqliteTable(
     exchangeDate: integer("exchange_date", { mode: "timestamp" }),
     note: text("note"),
     status: text("status", { enum: SANTA_STATUSES }).notNull().default("open"),
-    /** When the current draw was made. A participant who looked before this saw an older one. */
+    /** When the current draw was made. */
     drawnAt: integer("drawn_at", { mode: "timestamp" }),
+    /**
+     * How many times names have been drawn. A participant's seenDraw is
+     * compared with this, not their viewedAt with drawnAt: timestamps here are
+     * whole seconds, and a reveal and a redraw in the same second would read
+     * as the new draw having been seen.
+     */
+    drawCount: integer("draw_count").notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [index("santa_exchanges_organizer_idx").on(t.organizerId)],
@@ -524,6 +531,8 @@ export const santaParticipants = sqliteTable(
      * The organiser sees whether someone has looked, never what they saw.
      */
     viewedAt: integer("viewed_at", { mode: "timestamp" }),
+    /** The exchange's drawCount when they last looked. Behind it means a redraw since. */
+    seenDraw: integer("seen_draw"),
     /**
      * When the organiser last replaced their private link. Whoever replaces a
      * link can open it, so every reset is shown to the whole exchange; it is
@@ -583,6 +592,75 @@ export const santaAssignments = sqliteTable(
       .references(() => santaParticipants.id, { onDelete: "cascade" }),
   },
   (t) => [uniqueIndex("santa_assignments_receiver_idx").on(t.exchangeId, t.receiverId)],
+);
+
+/**
+ * The anonymous thread between a Santa and the person they drew. Hung off the
+ * assignment, so resetting the draw takes every thread with it: a new draw is
+ * a new pair, and the old conversation would be addressed to the wrong person.
+ *
+ * `senderId` is kept for rate limits and for the admin screen when a message
+ * is reported. It must never reach the receiver: their side of the thread is
+ * read by santaThread in src/lib/secret-santa.ts, which selects the body and
+ * `fromGiver` and nothing else.
+ */
+export const santaMessages = sqliteTable(
+  "santa_messages",
+  {
+    id: id(),
+    assignmentId: text("assignment_id")
+      .notNull()
+      .references(() => santaAssignments.id, { onDelete: "cascade" }),
+    senderId: text("sender_id")
+      .notNull()
+      .references(() => santaParticipants.id, { onDelete: "cascade" }),
+    /** True when the Santa wrote it; false when the person they drew did. */
+    fromGiver: integer("from_giver", { mode: "boolean" }).notNull(),
+    body: text("body").notNull(),
+    /** Set from /admin. A removed message stays a row so its report still makes sense. */
+    removedAt: integer("removed_at", { mode: "timestamp" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("santa_messages_assignment_idx").on(t.assignmentId, t.createdAt),
+    index("santa_messages_sender_idx").on(t.senderId, t.createdAt),
+  ],
+);
+
+/** A message someone in its thread flagged. Read on /admin, and nowhere else. */
+export const santaReports = sqliteTable(
+  "santa_reports",
+  {
+    id: id(),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => santaMessages.id, { onDelete: "cascade" }),
+    reporterId: text("reporter_id")
+      .notNull()
+      .references(() => santaParticipants.id, { onDelete: "cascade" }),
+    resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("santa_reports_message_reporter_idx").on(t.messageId, t.reporterId)],
+);
+
+/**
+ * Product analytics, as counts. A row is an event name and a time, and
+ * nothing else: no account, no exchange, no address, no cookie. That is the
+ * whole privacy story, so keep it true — anything added here has to be
+ * something that can't identify a person or a group. See src/lib/analytics.ts.
+ *
+ * Text rather than an enum in the column, like items.kind, so a new event needs
+ * no migration.
+ */
+export const analyticsEvents = sqliteTable(
+  "analytics_events",
+  {
+    id: id(),
+    event: text("event").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("analytics_events_event_idx").on(t.event, t.createdAt)],
 );
 
 export type User = typeof users.$inferSelect;

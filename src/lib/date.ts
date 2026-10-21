@@ -26,6 +26,18 @@ export function relativeEvent(date: Date | null): string | null {
   return `${weeks} weeks away`;
 }
 
+/** "12 days to go" / "Tomorrow" / "Today" / "Passed", counted in whole days. */
+export function countdown(date: Date | null): string | null {
+  if (!date) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((date.getTime() - today.getTime()) / 86_400_000);
+  if (days < 0) return "Passed";
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  return `${days} days to go`;
+}
+
 /** "16 September": for lines where the weekday would be noise. */
 export function formatShortDate(date: Date): string {
   return new Intl.DateTimeFormat(site.locale, {
@@ -44,4 +56,10 @@ export function toDateInput(date: Date | null): string {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** November and December, when groups are deciding who draws whom. */
+export function isSantaSeason(now: Date = new Date()): boolean {
+  const month = now.getMonth();
+  return month === 10 || month === 11;
 }

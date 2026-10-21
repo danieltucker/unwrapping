@@ -37,6 +37,11 @@ export function CopyButton({
       }
     >
       {copied ? "Copied" : label}
+      {/* A label that changes in place isn't reliably read out, so the result
+          is also said through a live region. */}
+      <span className="sr-only" aria-live="polite">
+        {copied ? "Copied to the clipboard" : ""}
+      </span>
     </button>
   );
 }

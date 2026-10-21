@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 
 import { db } from "@/db";
 import { items, type ItemKind } from "@/db/schema";
@@ -204,5 +204,7 @@ export async function addGift(
 
   revalidatePath(routes.manageList(list, ownerHandle));
   revalidatePath(routes.publicList(list, ownerHandle));
+  // The panel also opens from a Secret Santa page, which is neither of those.
+  refresh();
   return { ok: true };
 }

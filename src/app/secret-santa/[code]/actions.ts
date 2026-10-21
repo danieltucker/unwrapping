@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
+import { track } from "@/lib/analytics";
 import { santaManage, santaMine } from "@/lib/routes";
 import {
   addParticipant,
@@ -47,6 +48,7 @@ export async function joinExchange(
   if (result.outcome === "already-in") redirect(santaMine(code));
   if (result.outcome !== "joined") return { error: JOIN_MESSAGES[result.outcome] };
 
+  await track("santa_member_joined");
   await setSantaToken(code, result.token);
   revalidatePath(santaManage(code));
   redirect(`${santaMine(code)}?joined=1`);

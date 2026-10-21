@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { santaExchanges, santaExclusions, santaParticipants } from "@/db/schema";
+import { track } from "@/lib/analytics";
 import { origin } from "@/lib/origin";
 import { santaInvite, santaManage, santaMine, santaPrivateLink, secretSanta } from "@/lib/routes";
 import {
@@ -100,6 +101,7 @@ export async function addPerson(
     return { error: "Someone with that name is already in. Add an initial." };
   }
   if (result.outcome !== "joined") return { error: "They're already in." };
+  await track("santa_member_joined");
 
   refresh(resolved.exchange.code);
   return {
@@ -232,6 +234,7 @@ export async function drawExchange(
 
   const outcome = runDraw(resolved.exchange.id);
   if (outcome !== "drawn") return { error: DRAW_MESSAGES[outcome] };
+  await track("santa_draw_run");
 
   refresh(resolved.exchange.code);
   return { ok: true };

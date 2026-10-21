@@ -123,10 +123,19 @@ A few things worth knowing before you change them:
   account) shares `/secret-santa/<code>`; each person joins with a name and gets
   a private link, `/secret-santa/p/<token>`, stored only as a hash and
   remembered in a cookie per exchange. Who drew whom lives in
-  `santa_assignments` and is read in exactly one place, `assignmentFor` in
-  [`src/lib/secret-santa.ts`](src/lib/secret-santa.ts); the organiser's
-  dashboard must never reach it. Replacing someone's lost link is shown to the
-  whole exchange, because whoever holds the new link can open their page.
+  `santa_assignments` and is read only in
+  [`src/lib/secret-santa.ts`](src/lib/secret-santa.ts); a member's page renders
+  from `memberView`, which `npm run test:santa-privacy` checks for every member
+  of a drawn exchange. Replacing someone's lost link is shown to the whole
+  exchange, because whoever holds the new link can open their page. A Santa
+  reserving from the person they drew's list is always anonymous (see
+  `isSantaFor`), and only surprise lists can be linked.
+- **Analytics are counts.** `analytics_events` holds an event name and a time,
+  nothing else; see [`src/lib/analytics.ts`](src/lib/analytics.ts). The totals
+  are on `/admin`.
+- **Tests that need the database** run the real server modules under plain Node
+  through [`scripts/lib/app-loader.mjs`](scripts/lib/app-loader.mjs), which maps
+  `@/`, stubs `server-only`, and fakes `next/headers` with a cookie jar.
 - **Only public pages are indexable:** `/`, `/gifts` and its categories,
   `/secret-santa` (but nothing beneath it), and each *published* gift guide. Every other page under `/lists` is `noindex`
   through [`src/app/lists/layout.tsx`](src/app/lists/layout.tsx), and

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
+import { track } from "@/lib/analytics";
 import { santaExchanges } from "@/db/schema";
 import { santaManage } from "@/lib/routes";
 import {
@@ -35,10 +36,13 @@ export async function createExchange(
     .returning({ id: santaExchanges.id })
     .get();
 
+  await track("santa_group_created");
+
   // Organisers usually take part. They join under their account name, which
   // they can't change here; someone organising for the office can untick it.
   if (formData.get("takingPart") === "on") {
     addParticipant(exchange.id, user.name.slice(0, MAX_PERSON_NAME), user.id);
+    await track("santa_member_joined");
   }
 
   // redirect() throws a control-flow exception, so it must sit outside try/catch.

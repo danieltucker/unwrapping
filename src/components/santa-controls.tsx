@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 
 import { CopyButton } from "@/components/copy-button";
 import { Button, CapsLabel, Input } from "@/components/ui";
@@ -114,6 +114,19 @@ export function SantaConfirm({
 }) {
   const [state, submit, pending] = useActionState<SantaState, FormData>(action, {});
   const [confirming, setConfirming] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const promptId = useId();
+  // Only move focus because of a press, never on the first render.
+  const pressed = useRef(false);
+
+  // Keyboard and screen-reader users land where the decision is: on Cancel
+  // when the question appears (the safe choice for something irreversible),
+  // and back on the trigger when it goes.
+  useEffect(() => {
+    if (!pressed.current) return;
+    (confirming ? cancelRef : triggerRef).current?.focus();
+  }, [confirming]);
 
   // Back to the first step once the action answers, so the answer — a link to
   // pass on, or why it didn't work — has somewhere to show. Adjusted during
@@ -134,13 +147,25 @@ export function SantaConfirm({
     return (
       <div className={`flex flex-col gap-1.5 ${items}`}>
         {trigger === "button" ? (
-          <Button type="button" variant={tone === "violet" ? "primary" : "outline"} onClick={() => setConfirming(true)}>
+          <Button
+            ref={triggerRef}
+            type="button"
+            variant={tone === "violet" ? "primary" : "outline"}
+            onClick={() => {
+              pressed.current = true;
+              setConfirming(true);
+            }}
+          >
             {label}
           </Button>
         ) : (
           <button
+            ref={triggerRef}
             type="button"
-            onClick={() => setConfirming(true)}
+            onClick={() => {
+              pressed.current = true;
+              setConfirming(true);
+            }}
             className={`rounded-pill border px-[13px] py-1.5 text-xs font-semibold transition-colors duration-150 focus-ring ${
               tone === "rose"
                 ? "border-rose/30 text-rose hover:bg-rose-wash"
@@ -158,12 +183,22 @@ export function SantaConfirm({
   }
 
   return (
-    <form action={submit} className={`flex flex-col gap-2 ${items}`}>
+    <form
+      action={submit}
+      role="group"
+      aria-label={label}
+      className={`flex flex-col gap-2 ${items}`}
+    >
       <Hidden fields={fields} />
-      <p className={`max-w-[22rem] text-xs leading-[1.6] text-ink-76 ${text}`}>{prompt}</p>
+      <p id={promptId} className={`max-w-[22rem] text-xs leading-[1.6] text-ink-76 ${text}`}>
+        {prompt}
+      </p>
       <div className="flex items-center gap-2">
         <button
+          ref={cancelRef}
           type="button"
+          // Read out with the question, so Cancel isn't heard on its own.
+          aria-describedby={promptId}
           onClick={() => setConfirming(false)}
           className="rounded-pill border border-ink-line-strong px-[13px] py-1.5 text-xs font-semibold text-ink-72 transition-colors duration-150 hover:bg-ink/[.03] focus-ring"
         >
@@ -352,4 +387,16 @@ export function WishlistForm({
       <Answer state={state} />
     </form>
   );
+}
+
+/**
+ * Moves focus to the element with `id` once, when the page arrives with it.
+ * For the reveal: the name appears in place of the button that was pressed,
+ * and without this a screen reader would be left on nothing.
+ */
+export function FocusOnMount({ id }: { id: string }) {
+  useEffect(() => {
+    document.getElementById(id)?.focus();
+  }, [id]);
+  return null;
 }

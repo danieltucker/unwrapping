@@ -1,13 +1,15 @@
 /**
  * Checks for the Secret Santa draw.
  *
- *   node scripts/test-santa.mts
+ *   npm run test:santa
  *
  * A draw that hands someone their own name, or a couple each other, is the
  * one bug this feature can't recover from quietly: by the time anyone notices,
  * people have looked. So the rules are checked over many seeds, not one.
  */
 import { drawNames, pairKey, type RandomInt } from "../src/lib/santa-draw.ts";
+import { isSantaSeason } from "../src/lib/date.ts";
+import { ideaPrompts } from "../src/lib/santa-ideas.ts";
 
 let failures = 0;
 
@@ -145,6 +147,17 @@ check("nobody can't be drawn", drawNames([], new Set(), seeded(1)) === null);
     values,
   );
 }
+
+// --- Budget prompts and the season ---------------------------------------------
+check("no budget gets the middle prompts", ideaPrompts(null).length === 5);
+check("a $10 budget gets the smallest set", ideaPrompts(1000)[0] === ideaPrompts(1500)[0]);
+check("a $100 budget gets the largest set", ideaPrompts(10000)[0] === ideaPrompts(999999)[0]);
+check("the sets differ by budget", ideaPrompts(1000)[0] !== ideaPrompts(10000)[0]);
+
+check("1 November is the season", isSantaSeason(new Date(2026, 10, 1)));
+check("31 December is the season", isSantaSeason(new Date(2026, 11, 31)));
+check("31 October is not", !isSantaSeason(new Date(2026, 9, 31)));
+check("1 January is not", !isSantaSeason(new Date(2027, 0, 1)));
 
 console.log(failures === 0 ? "\nAll passed." : `\n${failures} failed.`);
 process.exit(failures === 0 ? 0 : 1);

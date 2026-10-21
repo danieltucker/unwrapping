@@ -1,7 +1,7 @@
 "use server";
 
 import { asc, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
@@ -15,7 +15,8 @@ import {
 } from "@/lib/contributions";
 import { copyGifts, ownedDestination, pickRows } from "@/lib/copying";
 import { insertList } from "@/lib/create-list";
-import { resolveList, viewerOwns } from "@/lib/list-access";
+import { resolveList, viewerOwns, type ResolvedList } from "@/lib/list-access";
+import { isSantaFor } from "@/lib/secret-santa";
 import { manageList, publicList } from "@/lib/routes";
 import { setItemBought } from "@/lib/reservations";
 import { parsePriceToCents } from "@/lib/scrape-parse";
@@ -26,6 +27,17 @@ import {
 } from "@/lib/session";
 
 export type ReserveState = { ok?: boolean; error?: string };
+
+/**
+ * After a guest changes something on a list: the list's own page, and
+ * whichever page they did it from. Those aren't always the same — a Secret
+ * Santa reserves from their Secret Santa page, which revalidating the list's
+ * path alone would leave showing the old state.
+ */
+function refreshList(resolved: ResolvedList) {
+  revalidatePath(publicList(resolved.list, resolved.ownerHandle));
+  refresh();
+}
 
 const MESSAGES = {
   gone: "Someone just claimed this one. Nothing was reserved for you.",
@@ -70,12 +82,15 @@ export async function reserveGift(
     return { error: "This one is chipped in on rather than reserved." };
   }
 
-  const firstName =
-    resolved.list.claimRule === "firstName"
-      ? String(formData.get("firstName") ?? "").trim()
-      : null;
+  // A Secret Santa reserving for the person they drew is always anonymous: a
+  // first name on the gift would tell anyone else in the family who visits
+  // this list exactly who drew whom. Their page never asks for one.
+  const asksForName =
+    resolved.list.claimRule === "firstName" && !(await isSantaFor(resolved.list.id));
 
-  if (resolved.list.claimRule === "firstName" && !firstName) {
+  const firstName = asksForName ? String(formData.get("firstName") ?? "").trim() : null;
+
+  if (asksForName && !firstName) {
     return { error: "This list asks for a first name so guests can coordinate." };
   }
 
@@ -88,7 +103,7 @@ export async function reserveGift(
     return { error: (item.kind === "idea" ? IDEA_MESSAGES : MESSAGES)[outcome] };
   }
 
-  revalidatePath(publicList(resolved.list, resolved.ownerHandle));
+  refreshList(resolved);
   return { ok: true };
 }
 
@@ -108,7 +123,7 @@ export async function releaseGift(
 
   await releaseItem(itemId, guestToken);
 
-  revalidatePath(publicList(resolved.list, resolved.ownerHandle));
+  refreshList(resolved);
   return { ok: true };
 }
 
@@ -174,7 +189,7 @@ export async function chipIn(
 
   if (outcome !== "recorded") return { error: CHIP_IN_MESSAGES[outcome] };
 
-  revalidatePath(publicList(resolved.list, resolved.ownerHandle));
+  refreshList(resolved);
   return {
     ok: true,
     amountCents,
@@ -205,7 +220,7 @@ export async function markGiftBought(
   const ok = await setItemBought(itemId, bought);
   if (!ok) return { error: "We couldn't find your reservation for this one." };
 
-  revalidatePath(publicList(resolved.list, resolved.ownerHandle));
+  refreshList(resolved);
   return { ok: true };
 }
 

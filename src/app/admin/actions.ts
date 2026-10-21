@@ -1,10 +1,18 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
-import { categories, items, lists, sessions, users } from "@/db/schema";
+import {
+  categories,
+  items,
+  lists,
+  santaMessages,
+  santaReports,
+  sessions,
+  users,
+} from "@/db/schema";
 import { adminOrNull, isAdmin, isAdminEmail } from "@/lib/admin";
 import { priceCheckState, runPriceChecks } from "@/lib/price-checks";
 import * as routes from "@/lib/routes";
@@ -399,4 +407,47 @@ export async function checkLinksNow(): Promise<AdminState> {
     ok: true,
     message: "Checking up to 10 due links in the background. Reload in a minute to see what it found.",
   };
+}
+
+/** A reported Secret Santa message that turned out to be fine. */
+export async function dismissReport(
+  _previous: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const admin = await adminOrNull();
+  if (!admin) return { error: NOT_ADMIN };
+
+  await db
+    .update(santaReports)
+    .set({ resolvedAt: new Date() })
+    .where(eq(santaReports.id, String(formData.get("reportId") ?? "")));
+
+  revalidatePath(routes.admin);
+  return { ok: true, message: "Dismissed." };
+}
+
+/**
+ * Takes a reported message out of its thread. The row stays, marked removed,
+ * so both sides see that something was taken down rather than a gap; every
+ * report on it is closed with it.
+ */
+export async function removeReportedMessage(
+  _previous: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const admin = await adminOrNull();
+  if (!admin) return { error: NOT_ADMIN };
+
+  const messageId = String(formData.get("messageId") ?? "");
+  const now = new Date();
+  db.transaction((tx) => {
+    tx.update(santaMessages).set({ removedAt: now }).where(eq(santaMessages.id, messageId)).run();
+    tx.update(santaReports)
+      .set({ resolvedAt: now })
+      .where(and(eq(santaReports.messageId, messageId), isNull(santaReports.resolvedAt)))
+      .run();
+  });
+
+  revalidatePath(routes.admin);
+  return { ok: true, message: "Removed from the thread." };
 }

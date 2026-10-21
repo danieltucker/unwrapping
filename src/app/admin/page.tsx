@@ -8,6 +8,8 @@ import {
   deleteAccount,
   deleteCategory,
   deleteList,
+  dismissReport,
+  removeReportedMessage,
   setAdmin,
   setBanned,
 } from "@/app/admin/actions";
@@ -31,10 +33,12 @@ import {
   type User,
 } from "@/db/schema";
 import { isAdmin, isAdminEmail, requireAdmin } from "@/lib/admin";
+import { eventCounts } from "@/lib/analytics";
 import { allCategories } from "@/lib/guides";
 import { linkHealth, priceCheckState } from "@/lib/price-checks";
 import { displayHost } from "@/lib/origin";
 import * as routes from "@/lib/routes";
+import { openReports } from "@/lib/secret-santa";
 import { listUploads, type StoredUpload } from "@/lib/uploads";
 
 export const metadata: Metadata = {
@@ -62,7 +66,7 @@ export const metadata: Metadata = {
 export default async function AdminPage() {
   const me = await requireAdmin();
 
-  const [categoryRows, links, accounts, allLists, uploads, photoOwners, uploadRows] = await Promise.all([
+  const [categoryRows, links, accounts, allLists, uploads, photoOwners, uploadRows, reports, santaEvents] = await Promise.all([
     allCategories(),
     linkHealth(),
 
@@ -98,6 +102,9 @@ export default async function AdminPage() {
 
     // Who uploaded what, for files uploaded since that was recorded.
     db.select().from(uploadRecords).all(),
+
+    openReports(),
+    eventCounts(),
   ]);
 
   /**
@@ -163,6 +170,72 @@ export default async function AdminPage() {
             />
           </CategoryRow>
         ))}
+      </Section>
+
+      <Section
+        title="Reported Secret Santa messages"
+        count={reports.length}
+        note="Reporters are never shown"
+        empty="Nothing reported. Messages between a Santa and the person they drew land here only if one of them flags it."
+      >
+        {reports.map((report) => (
+          <Row key={report.reportId}>
+            <div className="min-w-0 flex-1">
+              <p className="whitespace-pre-line break-words text-sm leading-[1.6]">
+                {report.removedAt ? <em className="text-ink-62">Already removed.</em> : report.body}
+              </p>
+              <p className="mt-1 text-xs text-ink-72">
+                From {report.senderName} in &ldquo;{report.exchangeName}&rdquo; · reported{" "}
+                {stamp(report.reportedAt)}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <AdminActionButton
+                action={dismissReport}
+                fields={{ reportId: report.reportId }}
+                label="It's fine"
+                busyLabel="Dismissing…"
+              />
+              <AdminDelete
+                action={removeReportedMessage}
+                fields={{ messageId: report.messageId }}
+                label="Remove"
+                prompt="Take this message out of the thread? Both people will see that a message was removed."
+                confirmLabel="Remove it"
+                busyLabel="Removing…"
+              />
+            </div>
+          </Row>
+        ))}
+      </Section>
+
+      <Section
+        title="Secret Santa"
+        count={santaEvents.santa_group_created.total}
+        note="Counts only: no people, no groups"
+        empty="No Secret Santas yet."
+        bare
+      >
+        <dl className="grid gap-2.5 sm:grid-cols-4">
+          {(
+            [
+              ["santa_group_created", "Groups created"],
+              ["santa_member_joined", "Members joined"],
+              ["santa_draw_run", "Draws run"],
+              ["santa_reveal_opened", "Reveals opened"],
+            ] as const
+          ).map(([event, label]) => (
+            <div key={event} className="rounded-card border border-ink-line bg-surface px-5 py-4">
+              <dt className="text-xs text-ink-72">{label}</dt>
+              <dd className="font-display text-[1.875rem] leading-none">
+                {santaEvents[event].last30}
+              </dd>
+              <dd className="mt-1 text-2xs text-ink-62">
+                last 30 days · {santaEvents[event].total} in all
+              </dd>
+            </div>
+          ))}
+        </dl>
       </Section>
 
       <Section

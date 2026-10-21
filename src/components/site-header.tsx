@@ -76,6 +76,15 @@ async function Identity() {
         Gift lists
       </Link>
 
+      {/* One step wider than Gift lists before it appears: on a phone the
+          cluster has no room for both, and the account menu has it too. */}
+      <Link
+        href={routes.secretSanta}
+        className="hidden items-center px-2 text-xs font-semibold text-(--header-muted) hover:text-(--header-fg) sm:inline-flex"
+      >
+        Secret Santa
+      </Link>
+
       {/* A guest with reservations gets a real control, not a line of prose. */}
       {reservedCount > 0 && !user ? (
         <Link

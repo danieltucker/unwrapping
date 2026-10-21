@@ -21,7 +21,7 @@ import {
   SantaConfirm,
 } from "@/components/santa-controls";
 import { SantaExchangeForm } from "@/components/santa-exchange-form";
-import { SantaCardHeader } from "@/components/santa-header";
+import { exchangeMeta, SantaCardHeader } from "@/components/santa-header";
 import { Card, CapsLabel } from "@/components/ui";
 import { formatShortDate, toDateInput } from "@/lib/date";
 import { displayHost, origin } from "@/lib/origin";
@@ -60,9 +60,16 @@ export default async function SantaManagePage({
 
   const open = exchange.status === "open";
   const nameOf = new Map(people.map((person) => [person.id, person.name]));
-  const looked = people.filter((person) => hasSeenCurrentDraw(exchange, person.viewedAt)).length;
+  const looked = people.filter((person) => hasSeenCurrentDraw(exchange, person.seenDraw)).length;
   const inviteUrl = `${origin}${routes.santaInvite(code)}`;
   const fields = { code };
+  const invitation = [
+    `Join our Secret Santa, ${exchange.emoji} ${exchange.name}!`,
+    ...exchangeMeta(exchange),
+    `Add your name here: ${inviteUrl}`,
+  ].join("\n");
+  const shareLink =
+    "rounded-pill border border-ink-line-strong bg-surface px-[15px] py-2 text-xs font-semibold transition-colors duration-150 hover:bg-ink/[.03] focus-ring";
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-[22px] py-10">
@@ -86,8 +93,10 @@ export default async function SantaManagePage({
         <div className="flex flex-col gap-8 p-[26px]">
           {/* The invite link. */}
           {open ? (
-            <section>
-              <CapsLabel className="mb-[7px]">Invite link</CapsLabel>
+            <section aria-labelledby="invite">
+              <h2 id="invite">
+                <CapsLabel className="mb-[7px]">Invite link</CapsLabel>
+              </h2>
               <div className="mb-[9px] flex items-center gap-[10px] rounded-control border border-ink-line-strong bg-surface px-[13px] py-[11px]">
                 <span className="min-w-0 flex-1 truncate font-mono text-sm font-medium text-ink/82">
                   {displayHost}
@@ -95,18 +104,40 @@ export default async function SantaManagePage({
                 </span>
                 <CopyButton value={inviteUrl} label="Copy link" />
               </div>
+              {/* The phone's own messaging and mail apps, with the words filled
+                  in. Nothing is sent from here: the organiser sends it, to
+                  whoever they choose, from their own account. */}
+              <div className="mb-[9px] flex flex-wrap gap-2">
+                <a
+                  href={`sms:?&body=${encodeURIComponent(invitation)}`}
+                  className={shareLink}
+                >
+                  Share by text
+                </a>
+                <a
+                  href={`mailto:?subject=${encodeURIComponent(`Join our Secret Santa: ${exchange.name}`)}&body=${encodeURIComponent(invitation)}`}
+                  className={shareLink}
+                >
+                  Share by email
+                </a>
+              </div>
               <p className="text-xs leading-[1.6] text-ink-66">
-                Paste it into your group chat. Anyone with it can join until you draw
+                Or paste it into your group chat. Anyone with it can join until you draw
                 names.
               </p>
             </section>
           ) : null}
 
           {/* The draw. */}
-          <section className="rounded-card border border-violet-edge bg-violet-wash p-5">
+          <section
+            aria-labelledby="draw"
+            className="rounded-card border border-violet-edge bg-violet-wash p-5"
+          >
             {open ? (
               <>
-                <p className="mb-1 text-base font-semibold">Draw names</p>
+                <h2 id="draw" className="mb-1 text-base font-semibold">
+                  Draw names
+                </h2>
                 <p className="mb-4 text-sm leading-relaxed text-ink-76">
                   {people.length < MIN_PARTICIPANTS
                     ? `It takes at least ${MIN_PARTICIPANTS} people. ${people.length} so far.`
@@ -128,7 +159,9 @@ export default async function SantaManagePage({
               </>
             ) : (
               <>
-                <p className="mb-1 text-base font-semibold">Names are drawn</p>
+                <h2 id="draw" className="mb-1 text-base font-semibold">
+                  Names are drawn
+                </h2>
                 <p className="mb-4 text-sm leading-relaxed text-ink-76">
                   {looked} of {people.length} have looked at theirs. Nudge the others to
                   open their private links. If someone needs to join or leave, reset the
@@ -175,7 +208,7 @@ export default async function SantaManagePage({
                     person.hasAccount ? "Has an account" : null,
                     person.hasWishlist ? "Wishlist linked" : "No wishlist yet",
                     !open
-                      ? hasSeenCurrentDraw(exchange, person.viewedAt)
+                      ? hasSeenCurrentDraw(exchange, person.seenDraw)
                         ? "Has looked"
                         : "Hasn't looked yet"
                       : null,
