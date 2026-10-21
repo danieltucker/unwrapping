@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
 import { connection } from "next/server";
 
 import { site } from "@/config/site";
@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { categories, items, lists, users, type Category } from "@/db/schema";
 import { isPriceFilterActive, matchesPriceFilter, type PriceFilter } from "@/lib/price";
 import { publicList } from "@/lib/routes";
+import type { ShelfSort } from "@/lib/sort";
 
 /**
  * Reading gift guides for the pages that browse them: /gifts, a category's
@@ -75,12 +76,17 @@ export async function categoryBySlug(slug: string): Promise<Category | null> {
 }
 
 /**
- * Published guides, most useful first.
+ * Published guides, most useful first unless a shelf's ?sort= says otherwise.
  *
  * "Popular" is how many people copied the whole list, which is the one signal
  * that someone found it worth keeping; ties, and a new instance where nothing
- * has been copied yet, fall back to the newest. Guides with nothing on them are
- * left out: an empty tile on a browse page is a dead end.
+ * has been copied yet, fall back to the newest. Every other order falls back
+ * to popular, then the name, then the id, so a shelf never shuffles between
+ * visits. Guides with nothing on them are left out: an empty tile on a browse
+ * page is a dead end.
+ *
+ * Sorted in the query, before `limit`: a shelf sorted A to Z starts at A, not
+ * at whichever of the most popular sixty comes first.
  */
 export async function publishedGuides({
   categoryId,
@@ -90,7 +96,7 @@ export async function publishedGuides({
 }: {
   /** Undefined for every category; a string for one shelf. */
   categoryId?: string;
-  order?: "popular" | "newest";
+  order?: ShelfSort;
   limit?: number;
   /**
    * Only guides with at least one present in this range, as a shelf's price
@@ -127,10 +133,7 @@ export async function publishedGuides({
         range ? priceMatchExists(range) : undefined,
       ),
     )
-    .orderBy(
-      ...(order === "popular" ? [desc(copyCount)] : []),
-      desc(lists.publishedAt),
-    )
+    .orderBy(...shelfOrder(order, copyCount, range))
     .limit(limit)
     .all();
 
@@ -190,6 +193,52 @@ export async function publishedGuides({
 }
 
 /**
+ * ORDER BY for a shelf. See publishedGuides.
+ *
+ * The price sorts go by a guide's cheapest present, or its cheapest one in the
+ * range when the shelf is filtered, since that is the gift the shopper came
+ * for. Only prices the filter could compare count (ideas have none, another
+ * currency is no price), and a guide with none goes last in both directions.
+ */
+function shelfOrder(order: ShelfSort, copyCount: SQL<number>, range: PriceFilter | null) {
+  const name = sql`${lists.name} collate nocase`;
+  const fallback = [desc(copyCount), asc(name), asc(lists.id)];
+
+  switch (order) {
+    case "popular":
+      return [desc(copyCount), desc(lists.publishedAt), asc(name), asc(lists.id)];
+    case "newest":
+      return [desc(lists.publishedAt), ...fallback];
+    case "az":
+      return [asc(name), desc(copyCount), asc(lists.id)];
+    case "low":
+    case "high": {
+      const cheapest = sql`(select min(${items.priceCents}) from ${items} where ${items.listId} = "lists"."id" and ${inRange(range)})`;
+      return [
+        sql`${cheapest} is null`,
+        order === "low" ? asc(cheapest) : desc(cheapest),
+        ...fallback,
+      ];
+    }
+  }
+}
+
+/**
+ * "This present has a price the filter can compare, inside the range": the
+ * same rule as matchesPriceFilter for a priced present. With no range, any
+ * comparable price.
+ */
+function inRange(price: PriceFilter | null) {
+  return and(
+    sql`${items.kind} <> 'idea'`,
+    sql`${items.priceCents} is not null`,
+    sql`upper(${items.currency}) = ${site.currency}`,
+    price?.minCents != null ? sql`${items.priceCents} >= ${price.minCents}` : undefined,
+    price?.maxCents != null ? sql`${items.priceCents} < ${price.maxCents}` : undefined,
+  );
+}
+
+/**
  * "This guide has a present in the range", in SQL: the same rule as
  * matchesPriceFilter, which counts them for the tile afterwards. Ideas have no
  * price and never count; a price in another currency counts as no price.
@@ -197,15 +246,9 @@ export async function publishedGuides({
  * `"lists"."id"` is written out for the reason given in allCategories.
  */
 function priceMatchExists(price: PriceFilter) {
-  const inRange = and(
-    sql`${items.priceCents} is not null`,
-    sql`upper(${items.currency}) = ${site.currency}`,
-    price.minCents !== null ? sql`${items.priceCents} >= ${price.minCents}` : undefined,
-    price.maxCents !== null ? sql`${items.priceCents} < ${price.maxCents}` : undefined,
-  );
   const unpriced = sql`(${items.priceCents} is null or upper(${items.currency}) <> ${site.currency})`;
 
-  return sql`exists (select 1 from ${items} where ${items.listId} = "lists"."id" and ${items.kind} <> 'idea' and (${inRange}${price.includeUnpriced ? sql` or ${unpriced}` : sql``}))`;
+  return sql`exists (select 1 from ${items} where ${items.listId} = "lists"."id" and ${items.kind} <> 'idea' and (${inRange(price)}${price.includeUnpriced ? sql` or ${unpriced}` : sql``}))`;
 }
 
 /** What a guide's own page shows beyond its gifts: whose it is, its shelf, how often it was copied. */

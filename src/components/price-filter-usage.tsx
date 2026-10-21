@@ -8,7 +8,7 @@ import { track } from "@/lib/track";
 
 /**
  * Reports filter_used when a guest works the price filter: a chip, the Clear
- * link, or the form's Apply. Recorded at the moment of use rather than when a
+ * link, or the price form's Apply. Recorded at the moment of use rather than when a
  * filtered page loads, so opening a shared filtered link counts as a visit,
  * not as somebody filtering.
  *
@@ -31,7 +31,11 @@ export function PriceFilterUsage({ children }: { children: ReactNode }) {
         if (link?.dataset.filterEvent) send(link.dataset.filterEvent);
       }}
       onSubmitCapture={(event) => {
-        const data = new FormData(event.target as HTMLFormElement);
+        // The sort's own form carries the range too, but sorting isn't
+        // filtering; SortSelect reports sort_used itself.
+        const form = event.target as HTMLFormElement;
+        if (!("priceForm" in form.dataset)) return;
+        const data = new FormData(form);
         const params = Object.fromEntries(
           [...data.entries()].map(([key, value]) => [key, String(value)]),
         );

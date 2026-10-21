@@ -15,6 +15,8 @@ import { copyDestinations } from "@/lib/copying";
 import { guideDetails } from "@/lib/guides";
 import { formatAboutRange, matchesPriceFilter, parsePriceFilter } from "@/lib/price";
 import { priceFilterEnabled } from "@/lib/price-filter-flag";
+import { giftSortControl, parseGiftSort, sortGifts } from "@/lib/sort";
+import { giftSortEnabled } from "@/lib/sort-flag";
 import { visibility } from "@/lib/visibility";
 import { formatEventDate } from "@/lib/date";
 import * as routes from "@/lib/routes";
@@ -61,10 +63,13 @@ export default async function PublicListPage({
   if (!view) notFound();
 
   const { list, items, stats, viewerIsOwner, ownerHandle } = view;
-  // ?min=&max=&unpriced=, applied here on the server so a filtered link is a
-  // whole page anyone can open, share or go back to. Null while PRICE_FILTER
-  // is off, and the params are then ignored. See src/lib/price.ts.
-  const priceFilter = priceFilterEnabled() ? parsePriceFilter(await searchParams) : null;
+  const query = await searchParams;
+  // ?min=&max=&unpriced=&sort=, applied here on the server so a filtered or
+  // sorted link is a whole page anyone can open, share or go back to. Each is
+  // null while its flag (PRICE_FILTER, GIFT_SORT) is off, and its params are
+  // then ignored. See src/lib/price.ts and src/lib/sort.ts.
+  const priceFilter = priceFilterEnabled() ? parsePriceFilter(query) : null;
+  const sort = giftSortEnabled() ? parseGiftSort(query) : null;
   const path = routes.publicList(list, ownerHandle);
   // The two halves of the page. Ideas keep the owner's ordering among
   // themselves, which is what splitting a single sorted array preserves.
@@ -82,9 +87,19 @@ export default async function PublicListPage({
   // feature settles, decide whether an idea whose presents are all out of
   // range should drop out too; ideaPriceRange in src/lib/price.ts is the
   // number to decide it with.
-  const shownGifts = priceFilter
+  //
+  // TODO(ideas): the same goes for ?sort=. Ideas, and the presents inside
+  // each one, keep the owner's order whatever the guest sorted the grid by.
+  // The ideas feature decides whether they should follow it, and with what:
+  // ideaPriceRange for the price sorts and isMostWanted for "top" are the
+  // obvious keys, but an idea has no single price. Whatever it decides belongs
+  // in sortGifts (src/lib/sort.ts), so there is still one rule for ties.
+  const inRange = priceFilter
     ? gifts.filter((item) => matchesPriceFilter(item, priceFilter))
     : gifts;
+  const shownGifts = sort ? sortGifts(inRange, sort) : inRange;
+  // Nothing to choose between with only one gift.
+  const sortControl = sort && gifts.length > 1 ? giftSortControl(sort, "wishlist") : null;
   const suggestions = new Map(
     ideas.map((idea) => [idea.id, items.filter((item) => item.parentId === idea.id)]),
   );
@@ -121,6 +136,7 @@ export default async function PublicListPage({
             copyCount={details.copyCount}
             viewerIsOwner={viewerIsOwner}
             priceFilter={priceFilter}
+            sort={sort}
             path={path}
           />
         </CopyProvider>
@@ -239,10 +255,11 @@ export default async function PublicListPage({
                   {/* The presents keep the filters and the sort; an idea has no
                       price to sort by and can never be taken, so it would sit out
                       every one of them. */}
-                  {priceFilter && gifts.length > 0 ? (
+                  {(priceFilter || sortControl) && gifts.length > 0 ? (
                     <PriceFilterBar
                       path={path}
                       filter={priceFilter}
+                      sort={sortControl}
                       shown={shownGifts.length}
                       total={gifts.length}
                       noun={["gift", "gifts"]}
@@ -259,6 +276,7 @@ export default async function PublicListPage({
                       signedIn={signedIn}
                       surpriseMode={list.surpriseMode}
                       affordableChip={priceFilter === null}
+                      clientSort={sort === null}
                     />
                   ) : null}
 

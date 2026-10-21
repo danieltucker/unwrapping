@@ -8,13 +8,14 @@ import { formatPrice } from "@/config/site";
 import type { ClaimRule } from "@/db/schema";
 import type { PublicItem } from "@/lib/claims";
 import { isStillOpen } from "@/lib/funding";
+import { sortGifts, type GiftSort } from "@/lib/sort";
 import { track } from "@/lib/track";
 
 /** The price the "under" filter draws its line at. */
 const AFFORDABLE_CENTS = 5000;
 
 type Filter = "all" | "free" | "affordable" | "wanted";
-type Sort = "owner" | "low" | "high";
+type Sort = Extract<GiftSort, "owner" | "low" | "high">;
 
 const MATCHES: Record<Filter, (item: PublicItem) => boolean> = {
   all: () => true,
@@ -32,6 +33,10 @@ const MATCHES: Record<Filter, (item: PublicItem) => boolean> = {
  * lives in the address and is applied on the server before `items` arrives
  * (see PriceFilterBar). The old "Under $50" chip only comes back while that
  * filter is switched off with PRICE_FILTER.
+ *
+ * So is the order. ?sort= is applied on the server too, and `items` arrives
+ * already sorted; this grid's own sort select only comes back while GIFT_SORT
+ * is off, and then sorts the same way (sortGifts).
  */
 export function GiftGrid({
   items,
@@ -42,6 +47,7 @@ export function GiftGrid({
   signedIn,
   surpriseMode,
   affordableChip = false,
+  clientSort = false,
 }: {
   items: PublicItem[];
   handle: string;
@@ -52,6 +58,8 @@ export function GiftGrid({
   surpriseMode: boolean;
   /** Offer "Under $50" here; only while the price filter bar is off. */
   affordableChip?: boolean;
+  /** Offer a sort select here; only while the filter bar's sort is off. */
+  clientSort?: boolean;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("owner");
@@ -76,17 +84,8 @@ export function GiftGrid({
 
   const visible = items.filter(MATCHES[filter]);
 
-  // A gift with no price has nothing to sort by, so it keeps to the end.
-  const sorted =
-    sort === "owner"
-      ? visible
-      : [...visible].sort((a, b) => {
-          if (a.priceCents === null) return 1;
-          if (b.priceCents === null) return -1;
-          return sort === "low"
-            ? a.priceCents - b.priceCents
-            : b.priceCents - a.priceCents;
-        });
+  // Without the select, `items` is already in the order the address asked for.
+  const sorted = clientSort ? sortGifts(visible, sort) : visible;
 
   // Exactly one filled button per screen: the most-wanted gift still free.
   const primaryId = sorted.find(
@@ -118,7 +117,7 @@ export function GiftGrid({
           );
         })}
 
-        {items.length > 1 ? (
+        {clientSort && items.length > 1 ? (
           <label className="ml-auto flex items-center gap-2 text-xs font-medium text-ink-62">
             <span>Sort</span>
             <select

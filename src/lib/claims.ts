@@ -35,6 +35,10 @@ export type PublicItem = {
    */
   parentId: string | null;
   title: string;
+  /** The owner's order among siblings, which every ?sort= falls back to. */
+  position: number;
+  /** When it was added, in milliseconds, for "Newest". Only to the second. */
+  addedAt: number;
   /**
    * The shop's page, tagged. Read for the referral disclosure, which has to
    * know what the links on the page really are; never rendered as a link.
@@ -197,6 +201,8 @@ export async function getPublicList(
       kind: item.kind,
       parentId: item.parentId,
       title: item.title,
+      position: item.position,
+      addedAt: item.createdAt.getTime(),
       href,
       buyHref: buyLink(item.id, href, list.kind === "guide" ? "guide" : "list"),
       sourceDomain: item.sourceDomain,

@@ -18,6 +18,7 @@ import {
   type PriceFilter,
 } from "@/lib/price";
 import * as routes from "@/lib/routes";
+import { giftSortControl, sortGifts, type GiftSort } from "@/lib/sort";
 import { placed } from "@/lib/tracking-flag";
 
 /**
@@ -40,6 +41,7 @@ export function GuideView({
   copyCount,
   viewerIsOwner,
   priceFilter,
+  sort,
   path,
 }: {
   list: List;
@@ -51,19 +53,28 @@ export function GuideView({
   viewerIsOwner: boolean;
   /** Null while PRICE_FILTER is off: no bar, nothing filtered. */
   priceFilter: PriceFilter | null;
+  /** ?sort=; null while GIFT_SORT is off: no select, the curator's order. */
+  sort: GiftSort | null;
   /** This page's own address, which the filter's links and form point at. */
   path: string;
 }) {
   const ideas = items.filter((item) => item.kind === "idea");
   const gifts = items.filter((item) => item.kind !== "idea" && item.parentId === null);
-  // Filtered on the server, so a filtered link is a page a crawler can read.
+  // Filtered and sorted on the server, so a filtered link is a page a crawler
+  // can read.
   // TODO(ideas): ideas and the picks under them are shown whatever the filter
   // says, as they always have been. Once ideas settle, decide whether an idea
   // whose picks are all out of range should drop out too; ideaPriceRange is
   // the number to decide it with.
-  const shownGifts = priceFilter
+  //
+  // TODO(ideas): and they keep the curator's order whatever ?sort= says. How
+  // an idea sorts is the ideas feature's to define (it has no single price);
+  // see the matching note in the wishlist page. The rule goes in sortGifts.
+  const inRange = priceFilter
     ? gifts.filter((item) => matchesPriceFilter(item, priceFilter))
     : gifts;
+  const shownGifts = sort ? sortGifts(inRange, sort) : inRange;
+  const sortControl = sort && gifts.length > 1 ? giftSortControl(sort, "guide") : null;
   const filtering = priceFilter !== null && isPriceFilterActive(priceFilter);
   const childrenOf = (id: string) => items.filter((item) => item.parentId === id);
 
@@ -180,10 +191,11 @@ export function GuideView({
             </p>
           ) : (
             <>
-              {priceFilter && gifts.length > 0 ? (
+              {(priceFilter || sortControl) && gifts.length > 0 ? (
                 <PriceFilterBar
                   path={path}
                   filter={priceFilter}
+                  sort={sortControl}
                   shown={shownGifts.length}
                   total={gifts.length}
                   noun={["gift", "gifts"]}

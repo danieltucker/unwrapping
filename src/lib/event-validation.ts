@@ -15,6 +15,7 @@
  * business (src/app/api/events/route.ts).
  */
 import type { ItemEventType } from "@/db/schema";
+import { GIFT_SORTS } from "@/lib/sort";
 
 export const MAX_BODY_BYTES = 16 * 1024;
 export const MAX_EVENTS_PER_BATCH = 50;
@@ -81,7 +82,9 @@ const RULES: Record<ClientEventType, EventRule> = {
   },
   sort_used: {
     needs: { list: true },
-    props: { sort: { kind: "enum", values: ["owner", "low", "high"] } },
+    // The sort select in the filter bar, or the grid's own while GIFT_SORT is
+    // off; that one only ever sends owner, low and high.
+    props: { sort: { kind: "enum", values: GIFT_SORTS } },
   },
   suggestion_impression: {
     needs: { list: true },

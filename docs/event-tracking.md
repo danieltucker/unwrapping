@@ -23,7 +23,8 @@ One row in `item_events` per event:
 |---|---|---|
 | `list_view` | browser | a list or gift guide page opens |
 | `item_impression` | browser | at least half of a gift or idea card is on screen; once per gift per page view |
-| `filter_used`, `sort_used` | browser | a guest changes the grid's filter or sort, or uses the price filter (a chip, Apply or Clear filters; opening a filtered link doesn't count). Only on a list page, not on a /gifts shelf |
+| `filter_used` | browser | a guest changes the grid's filter, or uses the price filter (a chip, Apply or Clear filters; opening a filtered link doesn't count). Only on a list page, not on a /gifts shelf |
+| `sort_used` | browser | a guest changes the sort in the filter bar, recording which of `owner`, `top`, `low`, `high`, `newest` or `az` they chose (opening a sorted link doesn't count). Only on a list page, not on a /gifts shelf. While `GIFT_SORT` is off, the grid's own sort sends `owner`, `low` or `high` |
 | `suggestion_impression`, `suggestion_click` | browser | a gift guide tile on the home page or /gifts is seen or opened |
 | `outbound_click` | server | a buy button is followed, through `/go/<itemId>` |
 | `item_claim` | server | a gift is reserved |

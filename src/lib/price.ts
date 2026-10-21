@@ -160,7 +160,7 @@ export function ideaPriceRange(
   children: readonly { priceCents: number | null; currency: string }[],
 ): { minCents: number; maxCents: number } | null {
   const prices = children
-    .filter((child) => comparable(child))
+    .filter((child) => hasComparablePrice(child))
     .map((child) => child.priceCents as number);
   if (prices.length === 0) return null;
   return { minCents: Math.min(...prices), maxCents: Math.max(...prices) };
@@ -248,11 +248,12 @@ function dollarsParam(value: string | string[] | undefined): number | null {
 }
 
 /**
- * Whether a price can be compared with the filter at all: there is one, and
- * it is in the site's currency. Cents of different currencies aren't the same
- * money, so a price in pounds on a dollar site counts as no price here.
+ * Whether a price can be compared with the filter, or sorted by, at all:
+ * there is one, and it is in the site's currency. Cents of different
+ * currencies aren't the same money, so a price in pounds on a dollar site
+ * counts as no price here.
  */
-function comparable(item: { priceCents: number | null; currency: string }): boolean {
+export function hasComparablePrice(item: { priceCents: number | null; currency: string }): boolean {
   return item.priceCents !== null && item.currency.toUpperCase() === site.currency;
 }
 
@@ -261,7 +262,7 @@ export function matchesPriceFilter(
   filter: PriceFilter,
 ): boolean {
   if (!isPriceFilterActive(filter)) return true;
-  if (!comparable(item)) return filter.includeUnpriced;
+  if (!hasComparablePrice(item)) return filter.includeUnpriced;
 
   const cents = item.priceCents as number;
   if (filter.minCents !== null && cents < filter.minCents) return false;
@@ -287,12 +288,21 @@ export function centsToParam(cents: number): string {
 /**
  * The address for a filter on a page. Empty values are left out so a shared
  * link reads cleanly, and `unpriced` is only written while it means something.
+ *
+ * `sort` is the page's ?sort=, carried along so picking a chip doesn't undo the
+ * order the guest chose. Null for the default, which is never written; see
+ * sortToParam in src/lib/sort.ts.
  */
-export function priceFilterHref(path: string, filter: PriceFilter): string {
+export function priceFilterHref(
+  path: string,
+  filter: PriceFilter,
+  sort: string | null = null,
+): string {
   const params = new URLSearchParams();
   if (filter.minCents !== null) params.set("min", centsToParam(filter.minCents));
   if (filter.maxCents !== null) params.set("max", centsToParam(filter.maxCents));
   if (isPriceFilterActive(filter) && filter.includeUnpriced) params.set("unpriced", "1");
+  if (sort) params.set("sort", sort);
   const query = params.toString();
   return query ? `${path}?${query}` : path;
 }
