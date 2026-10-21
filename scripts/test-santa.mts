@@ -7,7 +7,7 @@
  * one bug this feature can't recover from quietly: by the time anyone notices,
  * people have looked. So the rules are checked over many seeds, not one.
  */
-import { drawNames, pairKey, type RandomInt } from "../src/lib/santa-draw.ts";
+import { drawNames, forcedGivers, pairKey, type RandomInt } from "../src/lib/santa-draw.ts";
 import { isSantaSeason } from "../src/lib/date.ts";
 import { ideaPrompts } from "../src/lib/santa-ideas.ts";
 
@@ -146,6 +146,61 @@ check("nobody can't be drawn", drawNames([], new Set(), seeded(1)) === null);
     values.every((count) => Math.abs(count - runs / 9) < (runs / 9) * 0.2),
     values,
   );
+}
+
+// --- A draw the exclusions give away ---------------------------------------------
+{
+  const none = new Set<string>();
+  const three = ["a", "b", "c"];
+  check("three people, no exclusions: nobody's match is forced", forcedGivers(three, none, drawNames(three, none, seeded(1))!).length === 0);
+
+  // p0 may not draw p1 or p2, so p0 has p3 whatever happens.
+  const ids = people(4);
+  const exclusions = new Set([pairKey("p0", "p1"), pairKey("p0", "p2")]);
+  const draw = drawNames(ids, exclusions, seeded(5))!;
+  check("someone left one choice: the draw is still valid", valid(ids, exclusions, draw));
+  check("someone left one choice: they are forced", forcedGivers(ids, exclusions, draw).includes("p0"), forcedGivers(ids, exclusions, draw));
+
+  const couples = ["ann", "bob", "cat", "dan"];
+  const apart = new Set([pairKey("ann", "bob"), pairKey("cat", "dan")]);
+  check("two couples: nobody's match is forced", forcedGivers(couples, apart, drawNames(couples, apart, seeded(9))!).length === 0);
+}
+
+{
+  // Against brute force: every valid draw of up to six people, under random
+  // exclusions. A giver is forced exactly when every valid draw gives them the
+  // same person, and forcedGivers must agree from any one of those draws.
+  function permutations(values: string[]): string[][] {
+    if (values.length <= 1) return [values];
+    return values.flatMap((value, i) =>
+      permutations([...values.slice(0, i), ...values.slice(i + 1)]).map((rest) => [value, ...rest]),
+    );
+  }
+  const random = seeded(2026);
+  let agreed = 0;
+  let cases = 0;
+  let sawForced = false;
+  for (let trial = 0; trial < 300; trial += 1) {
+    const n = 4 + random(3);
+    const ids = people(n);
+    const exclusions = new Set<string>();
+    for (let i = 0; i < n; i += 1) {
+      for (let j = i + 1; j < n; j += 1) if (random(100) < 30) exclusions.add(pairKey(ids[i], ids[j]));
+    }
+    const draws = permutations(ids)
+      .map((receivers) => new Map(ids.map((giver, i) => [giver, receivers[i]])))
+      .filter((d) => valid(ids, exclusions, d));
+    if (draws.length === 0) continue;
+    const expected = ids
+      .filter((giver) => new Set(draws.map((d) => d.get(giver))).size === 1)
+      .sort()
+      .join();
+    sawForced ||= expected !== "";
+    cases += 1;
+    if (draws.every((d) => forcedGivers(ids, exclusions, d).sort().join() === expected)) agreed += 1;
+  }
+  check(`forced matches agree with brute force (${agreed}/${cases} cases)`, cases > 50 && agreed === cases);
+  check("brute force found some forced matches to compare", sawForced);
 }
 
 // --- Budget prompts and the season ---------------------------------------------

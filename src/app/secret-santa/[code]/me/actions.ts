@@ -9,6 +9,7 @@ import { lists, santaParticipants } from "@/db/schema";
 import { track } from "@/lib/analytics";
 import { insertList } from "@/lib/create-list";
 import { santaManage, santaMine, secretSanta } from "@/lib/routes";
+import { santaPaused } from "@/lib/santa-flag";
 import {
   currentParticipant,
   hasSeenCurrentDraw,
@@ -32,11 +33,17 @@ import { clearSantaToken, getCurrentUser, readSantaToken } from "@/lib/session";
 const NOT_IN =
   "We couldn't tell who you are in this Secret Santa. Open your private link again and retry.";
 
-async function me(formData: FormData) {
+/**
+ * Who is asking, or the sentence to answer with. `reading` is for the actions
+ * that stay open while Secret Santa is paused; see santaPaused.
+ */
+async function me(formData: FormData, reading = false) {
+  const paused = santaPaused(reading);
+  if (paused) return { error: paused };
   const resolved = await resolveExchange(String(formData.get("code") ?? ""));
-  if (!resolved) return null;
+  if (!resolved) return { error: NOT_IN };
   const participant = await currentParticipant(resolved.exchange);
-  return participant ? { ...resolved, participant } : null;
+  return participant ? { ...resolved, participant } : { error: NOT_IN };
 }
 
 function refresh(code: string) {
@@ -53,8 +60,8 @@ export async function revealMatch(
   _previous: SantaState,
   formData: FormData,
 ): Promise<SantaState> {
-  const found = await me(formData);
-  if (!found) return { error: NOT_IN };
+  const found = await me(formData, true);
+  if ("error" in found) return found;
   if (found.exchange.status !== "drawn") {
     return { error: "Names haven't been drawn yet. Check back once they are." };
   }
@@ -86,7 +93,7 @@ export async function setWishlist(
   formData: FormData,
 ): Promise<SantaState> {
   const found = await me(formData);
-  if (!found) return { error: NOT_IN };
+  if ("error" in found) return found;
 
   const picked = String(formData.get("listId") ?? "");
   const pasted = String(formData.get("link") ?? "").trim();
@@ -145,7 +152,7 @@ export async function createWishlist(
   formData: FormData,
 ): Promise<SantaState> {
   const found = await me(formData);
-  if (!found) return { error: NOT_IN };
+  if ("error" in found) return found;
   if (found.participant.wishlistId) return { ok: true };
 
   const { list } = await insertList({
@@ -184,7 +191,7 @@ export async function sendMessage(
   formData: FormData,
 ): Promise<SantaState> {
   const found = await me(formData);
-  if (!found) return { error: NOT_IN };
+  if ("error" in found) return found;
 
   const to = formData.get("to") === "santa" ? "santa" : "receiver";
   const outcome = await postMessage(
@@ -203,8 +210,9 @@ export async function reportSantaMessage(
   _previous: SantaState,
   formData: FormData,
 ): Promise<SantaState> {
-  const found = await me(formData);
-  if (!found) return { error: NOT_IN };
+  // Open while paused: a pause is often because of abuse, and this is how it's found.
+  const found = await me(formData, true);
+  if ("error" in found) return found;
 
   const outcome = await reportMessage(found.participant, String(formData.get("messageId") ?? ""));
   if (outcome === "missing") return { error: "That message isn't here any more." };
@@ -225,11 +233,17 @@ export async function keepWithAccount(
   formData: FormData,
 ): Promise<SantaState> {
   const found = await me(formData);
-  if (!found) return { error: NOT_IN };
+  if ("error" in found) return found;
 
   const user = await getCurrentUser();
   if (!user) return { error: "Sign in first, then come back to this page." };
   if (found.participant.userId === user.id) return { ok: true };
+  // Their link in this browser doesn't make them this account's. Without this,
+  // anyone holding the link — an organiser who replaced it — could move them
+  // off their own account and onto another.
+  if (found.participant.userId) {
+    return { error: "This place is already kept with a different account. Sign in as that one." };
+  }
 
   const other = await db
     .select({ id: santaParticipants.id })
@@ -259,7 +273,7 @@ export async function leaveExchange(
   formData: FormData,
 ): Promise<SantaState> {
   const found = await me(formData);
-  if (!found) return { error: NOT_IN };
+  if ("error" in found) return found;
   if (found.exchange.status !== "open") {
     return {
       error: `Names have already been drawn, so leaving would leave someone without a Santa. Ask ${found.organizerName} to reset the draw.`,

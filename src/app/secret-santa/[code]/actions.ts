@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { track } from "@/lib/analytics";
 import { santaManage, santaMine } from "@/lib/routes";
+import { santaPaused } from "@/lib/santa-flag";
 import {
   addParticipant,
   currentParticipant,
@@ -31,6 +32,9 @@ export async function joinExchange(
   _previous: SantaState,
   formData: FormData,
 ): Promise<SantaState> {
+  const paused = santaPaused();
+  if (paused) return { error: paused };
+
   const code = String(formData.get("code") ?? "");
   const resolved = await resolveExchange(code);
   if (!resolved) return { error: "This Secret Santa isn't here any more." };

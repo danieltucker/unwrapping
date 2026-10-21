@@ -3,6 +3,7 @@ import type { MetadataRoute } from "next";
 import { allCategories, publishedGuides } from "@/lib/guides";
 import { origin } from "@/lib/origin";
 import * as routes from "@/lib/routes";
+import { santaEnabled } from "@/lib/santa-flag";
 
 /**
  * The public pages, and nothing else: the landing page, /gifts, each category
@@ -34,11 +35,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     // The overview only. Every exchange under it is somebody's family.
-    {
-      url: `${origin}${routes.secretSanta}`,
-      changeFrequency: "monthly",
-      priority: 0.6,
-    },
+    ...(santaEnabled()
+      ? [{ url: `${origin}${routes.secretSanta}`, changeFrequency: "monthly" as const, priority: 0.6 }]
+      : []),
     ...categories.map((category) => ({
       url: `${origin}${routes.giftCategory(category.slug)}`,
       changeFrequency: "weekly" as const,

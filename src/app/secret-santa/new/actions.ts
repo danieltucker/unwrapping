@@ -10,9 +10,11 @@ import {
   addParticipant,
   MAX_PERSON_NAME,
   parseExchangeFields,
+  startedTooManyToday,
   uniqueExchangeCode,
   type SantaState,
 } from "@/lib/secret-santa";
+import { santaPaused } from "@/lib/santa-flag";
 import { getCurrentUser } from "@/lib/session";
 
 export async function createExchange(
@@ -21,6 +23,9 @@ export async function createExchange(
 ): Promise<SantaState> {
   // The dashboard is the only way back to the draw button, so it hangs off an
   // account rather than a cookie that a cleared browser would lose.
+  const paused = santaPaused();
+  if (paused) return { error: paused };
+
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Your sign-in has run out. Sign in again to start a Secret Santa." };
@@ -28,6 +33,10 @@ export async function createExchange(
 
   const parsed = parseExchangeFields(formData);
   if ("error" in parsed) return parsed;
+
+  if (await startedTooManyToday(user.id)) {
+    return { error: "That's a lot of Secret Santas for one day. Try again tomorrow." };
+  }
 
   const code = await uniqueExchangeCode();
   const exchange = await db

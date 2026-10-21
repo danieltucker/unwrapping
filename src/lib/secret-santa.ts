@@ -19,7 +19,7 @@ import {
 } from "@/db/schema";
 import { uniqueShortCode } from "@/lib/handle";
 import { DRAFT_SEGMENT, listSegments, manageList, publicList } from "@/lib/routes";
-import { drawNames, pairKey } from "@/lib/santa-draw";
+import { drawNames, forcedGivers, pairKey } from "@/lib/santa-draw";
 import { parsePriceToCents } from "@/lib/scrape-parse";
 import { getCurrentUser, readSantaToken, readSantaTokens } from "@/lib/session";
 
@@ -57,6 +57,23 @@ export async function uniqueExchangeCode(): Promise<string> {
   });
 }
 
+/** New exchanges per organiser per day: work, family and friends twice over, not a script. */
+export const NEW_EXCHANGES_PER_DAY = 10;
+
+export async function startedTooManyToday(organizerId: string): Promise<boolean> {
+  const row = await db
+    .select({ n: count() })
+    .from(santaExchanges)
+    .where(
+      and(
+        eq(santaExchanges.organizerId, organizerId),
+        gte(santaExchanges.createdAt, new Date(Date.now() - 86_400_000)),
+      ),
+    )
+    .get();
+  return (row?.n ?? 0) >= NEW_EXCHANGES_PER_DAY;
+}
+
 /**
  * What every Secret Santa action answers with. `link` is a private link that
  * has just been made, handed back once to the organiser who made it so they
@@ -76,15 +93,46 @@ export type ExchangeFields = {
 /** A budget past this is a typo, or a family that doesn't need a website. */
 const MAX_BUDGET_CENTS = 100_000_00;
 
+/**
+ * Characters nobody types on purpose and that change how text reads without
+ * showing: zero-width spaces that make "Sam" and "Sam" two different people,
+ * and direction overrides that make a name read backwards. The zero-width
+ * joiner stays, because emoji are built with it.
+ */
+const INVISIBLE = "\\u200B\\u200C\\u200E\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u2069\\uFEFF";
+/** For a single line — a name — where a line break is as unwanted as the rest. */
+const NOT_IN_A_LINE = new RegExp(`[\\p{Cc}${INVISIBLE}]`, "gu");
+/** For a note or a message, which may keep its line breaks and tabs. */
+const NOT_IN_TEXT = new RegExp(`[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F-\\u009F${INVISIBLE}]`, "gu");
+
+/** One line of text as it should be stored: whitespace runs as one space. */
+export function cleanLine(value: string): string {
+  return value.normalize("NFC").replace(/\s+/g, " ").replace(NOT_IN_A_LINE, "").trim();
+}
+
+/** Free text — a note, a message — with the invisible characters taken out. */
+export function cleanText(value: string): string {
+  return value.normalize("NFC").replace(NOT_IN_TEXT, "").trim();
+}
+
+/**
+ * The form of a name two people can't both have. Compatibility-folded, so a
+ * full-width "Ｓａｍ" is Sam, and without any format character at all,
+ * joiner included.
+ */
+export function nameKey(name: string): string {
+  return name.normalize("NFKC").replace(/\p{Cf}/gu, "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+}
+
 export function parseExchangeFields(
   formData: FormData,
 ): { fields: ExchangeFields } | { error: string } {
-  const name = String(formData.get("name") ?? "").trim();
+  const name = cleanLine(String(formData.get("name") ?? ""));
   if (!name) return { error: "Give it a name, like “Tucker family Christmas”." };
   if (name.length > 80) return { error: "That name is a little long." };
 
   // An emoji is a few code units at most; anything longer was pasted text.
-  const emoji = String(formData.get("emoji") ?? "").trim().slice(0, 16) || "🎅";
+  const emoji = cleanLine(String(formData.get("emoji") ?? "")).slice(0, 16) || "🎅";
 
   const rawBudget = String(formData.get("budget") ?? "").trim();
   let budgetCents: number | null = null;
@@ -102,7 +150,7 @@ export function parseExchangeFields(
     return { error: "That date didn't look right." };
   }
 
-  const note = String(formData.get("note") ?? "").trim() || null;
+  const note = cleanText(String(formData.get("note") ?? "")) || null;
   if (note && note.length > 1000) return { error: "That note is a little long." };
 
   return { fields: { name, emoji, budgetCents, exchangeDate, note } };
@@ -110,8 +158,8 @@ export function parseExchangeFields(
 
 /** A person's name as they typed it, or the sentence saying why it won't do. */
 export function parsePersonName(formData: FormData): { name: string } | { error: string } {
-  const name = String(formData.get("name") ?? "").trim().replace(/\s+/g, " ");
-  if (!name) return { error: "Type your name so everyone knows who’s in." };
+  const name = cleanLine(String(formData.get("name") ?? ""));
+  if (!nameKey(name)) return { error: "Type your name so everyone knows who’s in." };
   if (name.length > MAX_PERSON_NAME) return { error: "That name is a little long." };
   return { name };
 }
@@ -388,7 +436,7 @@ export async function postMessage(
     return "not-revealed";
   }
 
-  const body = rawBody.trim();
+  const body = cleanText(rawBody);
   if (!body) return "empty";
   if (body.length > MAX_MESSAGE) return "too-long";
 
@@ -629,9 +677,10 @@ export function addParticipant(
       return { outcome: "already-in" };
     }
     if (people.length >= MAX_PARTICIPANTS) return { outcome: "full" };
-    // Two Sams can't be told apart in an exclusion or a "who's looked" list.
-    const folded = name.toLocaleLowerCase();
-    if (people.some((person) => person.name.toLocaleLowerCase() === folded)) {
+    // Two Sams can't be told apart in an exclusion or a "who's looked" list,
+    // and neither can two that only differ by a character nobody can see.
+    const folded = nameKey(name);
+    if (people.some((person) => nameKey(person.name) === folded)) {
       return { outcome: "name-taken" };
     }
 
@@ -640,12 +689,16 @@ export function addParticipant(
   });
 }
 
-export type DrawOutcome = "drawn" | "not-open" | "too-few" | "impossible";
+export type DrawOutcome = "drawn" | "not-open" | "too-few" | "impossible" | "predictable";
 
 /**
  * Draws names for the whole exchange at once. The status check and the writes
  * share a transaction, so a double-click draws once and the second press is
  * told it already happened.
+ *
+ * Refused as "predictable" when the exclusions leave anyone exactly one person
+ * they could draw: the organiser chose those exclusions, so they would know
+ * that match without opening anything. See forcedGivers.
  */
 export function runDraw(exchangeId: string): DrawOutcome {
   return db.transaction((tx): DrawOutcome => {
@@ -675,6 +728,7 @@ export function runDraw(exchangeId: string): DrawOutcome {
 
     const draw = drawNames(ids, exclusions, (max) => randomInt(max));
     if (!draw) return "impossible";
+    if (forcedGivers(ids, exclusions, draw).length > 0) return "predictable";
 
     tx.delete(santaAssignments).where(eq(santaAssignments.exchangeId, exchangeId)).run();
     tx.insert(santaAssignments)

@@ -9,6 +9,7 @@ import { santaExchanges, santaExclusions, santaParticipants } from "@/db/schema"
 import { track } from "@/lib/analytics";
 import { origin } from "@/lib/origin";
 import { santaInvite, santaManage, santaMine, santaPrivateLink, secretSanta } from "@/lib/routes";
+import { santaPaused } from "@/lib/santa-flag";
 import {
   addParticipant,
   MIN_PARTICIPANTS,
@@ -34,8 +35,14 @@ const NOT_ORGANIZER =
 const DRAWN =
   "Names have already been drawn. Reset the draw first, and everyone will get a new name.";
 
-async function organized(formData: FormData): Promise<ResolvedExchange | null> {
-  return organizedExchangeOrNull(String(formData.get("code") ?? ""));
+/** The exchange if this account organised it, or the sentence to answer with. */
+async function organized(formData: FormData): Promise<ResolvedExchange | { error: string }> {
+  // Every organiser control changes something, so none is open while paused.
+  const paused = santaPaused();
+  if (paused) return { error: paused };
+  return (
+    (await organizedExchangeOrNull(String(formData.get("code") ?? ""))) ?? { error: NOT_ORGANIZER }
+  );
 }
 
 /** One of this exchange's participants, or null if the id belongs elsewhere. */
@@ -65,7 +72,7 @@ export async function updateExchange(
   formData: FormData,
 ): Promise<SantaState> {
   const resolved = await organized(formData);
-  if (!resolved) return { error: NOT_ORGANIZER };
+  if ("error" in resolved) return resolved;
 
   const parsed = parseExchangeFields(formData);
   if ("error" in parsed) return parsed;
@@ -89,7 +96,7 @@ export async function addPerson(
   formData: FormData,
 ): Promise<SantaState> {
   const resolved = await organized(formData);
-  if (!resolved) return { error: NOT_ORGANIZER };
+  if ("error" in resolved) return resolved;
 
   const parsed = parsePersonName(formData);
   if ("error" in parsed) return parsed;
@@ -116,7 +123,7 @@ export async function removeParticipant(
   formData: FormData,
 ): Promise<SantaState> {
   const resolved = await organized(formData);
-  if (!resolved) return { error: NOT_ORGANIZER };
+  if ("error" in resolved) return resolved;
   if (resolved.exchange.status !== "open") return { error: DRAWN };
 
   const participant = await participantIn(
@@ -145,7 +152,7 @@ export async function resetPrivateLink(
   formData: FormData,
 ): Promise<SantaState> {
   const resolved = await organized(formData);
-  if (!resolved) return { error: NOT_ORGANIZER };
+  if ("error" in resolved) return resolved;
 
   const participant = await participantIn(
     resolved.exchange.id,
@@ -172,7 +179,7 @@ export async function addExclusion(
   formData: FormData,
 ): Promise<SantaState> {
   const resolved = await organized(formData);
-  if (!resolved) return { error: NOT_ORGANIZER };
+  if ("error" in resolved) return resolved;
   if (resolved.exchange.status !== "open") return { error: DRAWN };
 
   const firstId = String(formData.get("firstId") ?? "");
@@ -202,7 +209,7 @@ export async function removeExclusion(
   formData: FormData,
 ): Promise<SantaState> {
   const resolved = await organized(formData);
-  if (!resolved) return { error: NOT_ORGANIZER };
+  if ("error" in resolved) return resolved;
   if (resolved.exchange.status !== "open") return { error: DRAWN };
 
   await db
@@ -223,6 +230,8 @@ const DRAW_MESSAGES = {
   "too-few": `It takes at least ${MIN_PARTICIPANTS} people to draw names.`,
   impossible:
     "There's no way to draw names that keeps everyone apart who should be. Remove a “keep apart” pair and try again.",
+  predictable:
+    "Those “keep apart” pairs leave someone with only one person they could draw, so their match wouldn't be a secret — not even from you. Remove a pair and try again.",
 } as const;
 
 export async function drawExchange(
@@ -230,7 +239,7 @@ export async function drawExchange(
   formData: FormData,
 ): Promise<SantaState> {
   const resolved = await organized(formData);
-  if (!resolved) return { error: NOT_ORGANIZER };
+  if ("error" in resolved) return resolved;
 
   const outcome = runDraw(resolved.exchange.id);
   if (outcome !== "drawn") return { error: DRAW_MESSAGES[outcome] };
@@ -245,7 +254,7 @@ export async function resetExchangeDraw(
   formData: FormData,
 ): Promise<SantaState> {
   const resolved = await organized(formData);
-  if (!resolved) return { error: NOT_ORGANIZER };
+  if ("error" in resolved) return resolved;
   if (resolved.exchange.status !== "drawn") return { ok: true };
 
   resetDraw(resolved.exchange.id);
@@ -259,7 +268,7 @@ export async function deleteExchange(
   formData: FormData,
 ): Promise<SantaState> {
   const resolved = await organized(formData);
-  if (!resolved) return { error: NOT_ORGANIZER };
+  if ("error" in resolved) return resolved;
 
   // Participants, exclusions and the draw all cascade with it.
   await db.delete(santaExchanges).where(eq(santaExchanges.id, resolved.exchange.id));

@@ -21,7 +21,8 @@ export function AccountMenu({
   reservedCount: number;
   listsHref: string;
   profileHref: string;
-  secretSantaHref: string;
+  /** Null while Secret Santa is switched off; see src/lib/santa-flag.ts. */
+  secretSantaHref: string | null;
   /** Only set for whoever runs the instance; nobody else is offered the screen. */
   adminHref?: string | null;
 }) {
@@ -97,14 +98,16 @@ export function AccountMenu({
             ) : null}
           </Link>
 
-          <Link
-            href={secretSantaHref}
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className="block px-4 py-3 text-sm font-medium hover:bg-ink/[.03]"
-          >
-            Secret Santa
-          </Link>
+          {secretSantaHref ? (
+            <Link
+              href={secretSantaHref}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="block px-4 py-3 text-sm font-medium hover:bg-ink/[.03]"
+            >
+              Secret Santa
+            </Link>
+          ) : null}
 
           <Link
             href={profileHref}

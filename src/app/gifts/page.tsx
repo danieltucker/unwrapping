@@ -6,6 +6,7 @@ import { SantaSeasonBanner } from "@/components/santa-season-banner";
 import { ButtonLink } from "@/components/ui";
 import { site } from "@/config/site";
 import * as routes from "@/lib/routes";
+import { santaEnabled } from "@/lib/santa-flag";
 import { allCategories, publishedGuides } from "@/lib/guides";
 
 export const metadata: Metadata = {
@@ -67,7 +68,7 @@ export default async function GiftGuidesPage() {
           </section>
         ) : null}
 
-        <SecretSantaCard />
+        {santaEnabled() ? <SecretSantaCard /> : null}
 
         <MakeOneCta />
       </div>

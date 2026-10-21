@@ -6,6 +6,7 @@ import { HeaderBar } from "@/components/header-bar";
 import { isAdmin } from "@/lib/admin";
 import { countGuestReservations } from "@/lib/reservations";
 import * as routes from "@/lib/routes";
+import { santaEnabled } from "@/lib/santa-flag";
 import { getCurrentUser } from "@/lib/session";
 
 /** Gift-tag mark, so the reservations entry reads as a thing, not a sentence. */
@@ -78,12 +79,14 @@ async function Identity() {
 
       {/* One step wider than Gift lists before it appears: on a phone the
           cluster has no room for both, and the account menu has it too. */}
-      <Link
-        href={routes.secretSanta}
-        className="hidden items-center px-2 text-xs font-semibold text-(--header-muted) hover:text-(--header-fg) sm:inline-flex"
-      >
-        Secret Santa
-      </Link>
+      {santaEnabled() ? (
+        <Link
+          href={routes.secretSanta}
+          className="hidden items-center px-2 text-xs font-semibold text-(--header-muted) hover:text-(--header-fg) sm:inline-flex"
+        >
+          Secret Santa
+        </Link>
+      ) : null}
 
       {/* A guest with reservations gets a real control, not a line of prose. */}
       {reservedCount > 0 && !user ? (
@@ -106,7 +109,7 @@ async function Identity() {
           reservedCount={reservedCount}
           listsHref={routes.myLists}
           profileHref={routes.profile}
-          secretSantaHref={routes.secretSanta}
+          secretSantaHref={santaEnabled() ? routes.secretSanta : null}
           adminHref={isAdmin(user) ? routes.admin : null}
         />
       ) : (

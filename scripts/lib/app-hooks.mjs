@@ -2,7 +2,7 @@
  * Module resolution for tests that run the app's own server code under plain
  * Node, outside Next. Registered by scripts/lib/app-loader.mjs.
  *
- * Three things Next normally provides, and nothing else:
+ * Four things Next normally provides, and nothing else:
  *
  * - `@/…` resolves into src/, as tsconfig.json says.
  * - Relative imports without an extension find their .ts file, as the bundler
@@ -10,6 +10,9 @@
  * - `server-only` is a no-op, and `next/headers` is a cookie jar the test
  *   controls (scripts/lib/next-headers-stub.mjs), so code that reads who is
  *   asking can be asked as anyone.
+ * - `next/navigation` and `next/cache` are small stand-ins, so a Server Action
+ *   can be called directly: redirect() throws something a test can read, and
+ *   revalidatePath() does nothing (scripts/lib/next-*-stub.mjs).
  */
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -27,15 +30,18 @@ function findSource(base) {
   return hit ? pathToFileURL(hit).href : null;
 }
 
+const STUBS = {
+  "next/headers": "scripts/lib/next-headers-stub.mjs",
+  "next/navigation": "scripts/lib/next-navigation-stub.mjs",
+  "next/cache": "scripts/lib/next-cache-stub.mjs",
+};
+
 export async function resolve(specifier, context, next) {
   if (specifier === "server-only") {
     return { url: "data:text/javascript,export {};", shortCircuit: true };
   }
-  if (specifier === "next/headers") {
-    return {
-      url: pathToFileURL(path.join(root, "scripts/lib/next-headers-stub.mjs")).href,
-      shortCircuit: true,
-    };
+  if (specifier in STUBS) {
+    return { url: pathToFileURL(path.join(root, STUBS[specifier])).href, shortCircuit: true };
   }
   if (specifier.startsWith("@/")) {
     const url = findSource(path.join(src, specifier.slice(2)));

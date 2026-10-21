@@ -64,6 +64,72 @@ export function drawNames(
   return search(ids, allowed, randomInt);
 }
 
+/**
+ * The givers who could only ever have drawn the person they did, whatever the
+ * dice said, given these exclusions. Empty for any ordinary group.
+ *
+ * Whoever chose the exclusions — the organiser — can work those pairs out
+ * without looking at anything, so a draw with one in it isn't secret. Leaving
+ * Ann a single person she may draw is the quiet way to peek, where replacing
+ * her private link is the loud one; runDraw refuses it.
+ *
+ * `draw` is any valid draw. Another valid draw can give `g` someone else
+ * exactly when `g` lies on a cycle of "g could take the receiver g' has": swap
+ * everybody round that cycle and every rule still holds. So a giver is forced
+ * when their strongly connected component in that graph is themselves alone.
+ */
+export function forcedGivers(
+  ids: readonly string[],
+  exclusions: ReadonlySet<string>,
+  draw: ReadonlyMap<string, string>,
+): string[] {
+  const allowed = (giver: string, receiver: string) =>
+    giver !== receiver && !exclusions.has(pairKey(giver, receiver));
+  const next = new Map(
+    ids.map((giver) => [
+      giver,
+      ids.filter((other) => other !== giver && allowed(giver, draw.get(other)!)),
+    ]),
+  );
+
+  // Tarjan's algorithm. A group is at most 100 people, so recursion is fine.
+  const index = new Map<string, number>();
+  const low = new Map<string, number>();
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  const forced: string[] = [];
+  let counter = 0;
+
+  const visit = (v: string) => {
+    index.set(v, counter);
+    low.set(v, counter);
+    counter += 1;
+    stack.push(v);
+    onStack.add(v);
+    for (const w of next.get(v)!) {
+      if (!index.has(w)) {
+        visit(w);
+        low.set(v, Math.min(low.get(v)!, low.get(w)!));
+      } else if (onStack.has(w)) {
+        low.set(v, Math.min(low.get(v)!, index.get(w)!));
+      }
+    }
+    if (low.get(v) === index.get(v)) {
+      const component: string[] = [];
+      let w: string;
+      do {
+        w = stack.pop()!;
+        onStack.delete(w);
+        component.push(w);
+      } while (w !== v);
+      if (component.length === 1) forced.push(v);
+    }
+  };
+
+  for (const id of ids) if (!index.has(id)) visit(id);
+  return forced;
+}
+
 function search(
   ids: readonly string[],
   allowed: (giver: string, receiver: string) => boolean,

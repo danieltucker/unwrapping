@@ -3,6 +3,7 @@ import { connection } from "next/server";
 
 import { isSantaSeason } from "@/lib/date";
 import * as routes from "@/lib/routes";
+import { santaEnabled } from "@/lib/santa-flag";
 
 /**
  * A thin strip pointing at Secret Santa, shown in season and not otherwise.
@@ -12,7 +13,7 @@ import * as routes from "@/lib/routes";
  */
 export async function SantaSeasonBanner() {
   await connection();
-  if (!isSantaSeason()) return null;
+  if (!isSantaSeason() || !santaEnabled()) return null;
 
   return (
     <aside
