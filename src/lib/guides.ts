@@ -3,8 +3,10 @@ import "server-only";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { connection } from "next/server";
 
+import { site } from "@/config/site";
 import { db } from "@/db";
 import { categories, items, lists, users, type Category } from "@/db/schema";
+import { isPriceFilterActive, matchesPriceFilter, type PriceFilter } from "@/lib/price";
 import { publicList } from "@/lib/routes";
 
 /**
@@ -36,6 +38,11 @@ export type GuideSummary = {
   previews: { image: string | null; emoji: string | null }[];
   category: { slug: string; name: string } | null;
   publishedAt: Date;
+  /**
+   * How many of its presents are in the price range a shelf was filtered by,
+   * so a tile can say "3 in your range". Null when nothing was filtered.
+   */
+  priceMatches: number | null;
 };
 
 export type CategoryWithCount = Category & { guideCount: number };
@@ -79,15 +86,23 @@ export async function publishedGuides({
   categoryId,
   order = "popular",
   limit = 24,
+  price,
 }: {
   /** Undefined for every category; a string for one shelf. */
   categoryId?: string;
   order?: "popular" | "newest";
   limit?: number;
+  /**
+   * Only guides with at least one present in this range, as a shelf's price
+   * filter asks. Checked in the query rather than after it, so `limit`
+   * counts guides that match and a shelf never comes up short.
+   */
+  price?: PriceFilter;
 } = {}): Promise<GuideSummary[]> {
   await connection();
   const giftCount = sql<number>`(select count(*) from ${items} where ${items.listId} = "lists"."id")`;
   const copyCount = sql<number>`(select count(*) from ${lists} as copies where copies.copied_from_list_id = "lists"."id")`;
+  const range = price && isPriceFilterActive(price) ? price : null;
 
   const rows = await db
     .select({
@@ -109,6 +124,7 @@ export async function publishedGuides({
         isNull(users.bannedAt),
         categoryId ? eq(lists.categoryId, categoryId) : undefined,
         sql`${giftCount} > 0`,
+        range ? priceMatchExists(range) : undefined,
       ),
     )
     .orderBy(
@@ -125,9 +141,12 @@ export async function publishedGuides({
   const pictures = await db
     .select({
       listId: items.listId,
+      kind: items.kind,
       images: items.images,
       selectedImageIndex: items.selectedImageIndex,
       emoji: items.emoji,
+      priceCents: items.priceCents,
+      currency: items.currency,
     })
     .from(items)
     .where(inArray(items.listId, rows.map((row) => row.list.id)))
@@ -159,7 +178,34 @@ export async function publishedGuides({
         ? { slug: row.categorySlug, name: row.categoryName }
         : null,
     publishedAt: row.list.publishedAt!,
+    priceMatches: range
+      ? pictures.filter(
+          (item) =>
+            item.listId === row.list.id &&
+            item.kind !== "idea" &&
+            matchesPriceFilter(item, range),
+        ).length
+      : null,
   }));
+}
+
+/**
+ * "This guide has a present in the range", in SQL: the same rule as
+ * matchesPriceFilter, which counts them for the tile afterwards. Ideas have no
+ * price and never count; a price in another currency counts as no price.
+ *
+ * `"lists"."id"` is written out for the reason given in allCategories.
+ */
+function priceMatchExists(price: PriceFilter) {
+  const inRange = and(
+    sql`${items.priceCents} is not null`,
+    sql`upper(${items.currency}) = ${site.currency}`,
+    price.minCents !== null ? sql`${items.priceCents} >= ${price.minCents}` : undefined,
+    price.maxCents !== null ? sql`${items.priceCents} < ${price.maxCents}` : undefined,
+  );
+  const unpriced = sql`(${items.priceCents} is null or upper(${items.currency}) <> ${site.currency})`;
+
+  return sql`exists (select 1 from ${items} where ${items.listId} = "lists"."id" and ${items.kind} <> 'idea' and (${inRange}${price.includeUnpriced ? sql` or ${unpriced}` : sql``}))`;
 }
 
 /** What a guide's own page shows beyond its gifts: whose it is, its shelf, how often it was copied. */

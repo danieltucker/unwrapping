@@ -17,9 +17,11 @@ import {
 import { GoalField } from "@/components/goal-field";
 import { useIsGuide } from "@/components/list-kind";
 import { MoveIntoIdea, type MovableGift } from "@/components/move-into-idea";
+import { PriceHint } from "@/components/price-tag";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
 import { centsToInput } from "@/config/site";
 import type { ItemKind } from "@/db/schema";
+import { PRICE_LABEL_MAX } from "@/lib/price";
 import type { ScrapeResult } from "@/lib/scrape";
 
 const EMPTY_MANUAL: ScrapeResult = {
@@ -470,14 +472,17 @@ function ConfirmGift({
                   <label htmlFor="price">
                     <CapsLabel className="mb-[5px] text-2xs">Price</CapsLabel>
                   </label>
+                  {/* Text rather than a number keypad: "from $35" is allowed. */}
                   <Input
                     id="price"
                     name="price"
-                    inputMode="decimal"
                     defaultValue={priceValue}
-                    placeholder="-"
+                    placeholder="29.99"
+                    maxLength={PRICE_LABEL_MAX}
+                    aria-describedby="price-hint"
                     className="py-[9px] text-sm"
                   />
+                  <PriceHint id="price-hint" />
                 </div>
                 {guide ? null : (
                   <div className="w-[72px] shrink-0">

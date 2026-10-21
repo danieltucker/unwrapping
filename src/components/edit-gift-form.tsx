@@ -17,9 +17,11 @@ import {
 import { GoalField } from "@/components/goal-field";
 import { useIsGuide } from "@/components/list-kind";
 import { IdeaField, type IdeaOption } from "@/components/move-into-idea";
+import { PriceHint } from "@/components/price-tag";
 import { Button, CapsLabel, Input, Textarea } from "@/components/ui";
 import { centsToInput } from "@/config/site";
 import type { Item } from "@/db/schema";
+import { PRICE_LABEL_MAX } from "@/lib/price";
 
 /** Identifies the list in every form on this page. */
 type ListKeys = { handle: string; listKey: string };
@@ -120,14 +122,18 @@ export function EditGiftForm({
                   <label htmlFor="price">
                     <CapsLabel className="mb-[5px] text-2xs">Price</CapsLabel>
                   </label>
+                  {/* Text rather than a number keypad: "from $35" is allowed.
+                      The owner's own words come back as they typed them. */}
                   <Input
                     id="price"
                     name="price"
-                    inputMode="decimal"
-                    defaultValue={centsToInput(item.priceCents)}
-                    placeholder="-"
+                    defaultValue={item.priceLabel ?? centsToInput(item.priceCents)}
+                    placeholder="29.99"
+                    maxLength={PRICE_LABEL_MAX}
+                    aria-describedby="price-hint"
                     className="py-[9px] text-sm"
                   />
+                  <PriceHint id="price-hint" />
                 </div>
                 {guide ? null : (
                   <div className="w-[72px] shrink-0">

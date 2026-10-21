@@ -60,7 +60,24 @@ const RULES: Record<ClientEventType, EventRule> = {
   },
   filter_used: {
     needs: { list: true },
-    props: { filter: { kind: "enum", values: ["all", "free", "affordable", "wanted"] } },
+    props: {
+      filter: {
+        kind: "enum",
+        values: [
+          "all",
+          "free",
+          // The grid's old "Under $50" chip, shown only while PRICE_FILTER is off.
+          "affordable",
+          "wanted",
+          // The price filter bar: a chip, or a range typed in. See filterEventValue.
+          "price_under_25",
+          "price_25_50",
+          "price_50_100",
+          "price_100_up",
+          "price_custom",
+        ],
+      },
+    },
   },
   sort_used: {
     needs: { list: true },

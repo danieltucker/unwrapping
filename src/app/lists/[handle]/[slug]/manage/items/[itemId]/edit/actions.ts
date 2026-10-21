@@ -10,9 +10,10 @@ import { parseGiftEmoji } from "@/lib/emoji";
 import { moveUnderIdea } from "@/lib/item-moves";
 import { requireOwnedList, type ResolvedList } from "@/lib/list-access";
 import { sourceDomain } from "@/lib/outbound";
+import { PRICE_ERROR, parsePriceInput } from "@/lib/price";
 import { recordPrice } from "@/lib/price-checks";
 import * as routes from "@/lib/routes";
-import { parsePriceToCents, scrapeProduct } from "@/lib/scrape";
+import { scrapeProduct } from "@/lib/scrape";
 
 /**
  * `ok` rather than a redirect: this form is a dialog over the editor, so
@@ -57,13 +58,16 @@ export async function updateItem(
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "A gift needs a title." };
 
-  const rawPrice = String(formData.get("price") ?? "").trim();
-  // An idea is a direction, not a purchase; it has no price to edit.
-  const priceCents =
-    item.kind === "idea" || !rawPrice ? null : parsePriceToCents(rawPrice);
-  if (item.kind !== "idea" && rawPrice && priceCents === null) {
-    return { error: "That price didn't look like a number." };
+  // An idea is a direction, not a purchase; it has no price to edit. Words
+  // like "from $35" are kept as typed; see parsePriceInput.
+  const price =
+    item.kind === "idea"
+      ? { cents: null, label: null }
+      : parsePriceInput(String(formData.get("price") ?? ""));
+  if (price === null) {
+    return { error: PRICE_ERROR };
   }
+  const priceCents = price.cents;
 
   // On a guide nothing is bought for one person: no units, no chipping in.
   // See addGift.
@@ -93,7 +97,7 @@ export async function updateItem(
     item.kind === "cash" ||
     (item.kind === "thing" && !guide && formData.get("isGroupGift") === "on");
   const rawGoal = String(formData.get("goal") ?? "").trim();
-  const parsedGoal = rawGoal ? parsePriceToCents(rawGoal) : null;
+  const parsedGoal = rawGoal ? (parsePriceInput(rawGoal)?.cents ?? null) : null;
   if (isGroupGift && rawGoal && parsedGoal === null) {
     return { error: "That goal didn't look like a number." };
   }
@@ -103,10 +107,11 @@ export async function updateItem(
     .set({
       title,
       priceCents,
+      priceLabel: price.label,
       // A price that was edited is the owner's now, and the recheck leaves it
       // alone from here on. One that was left as it was keeps its source.
       priceSource:
-        priceCents === item.priceCents
+        priceCents === item.priceCents && price.label === item.priceLabel
           ? item.priceSource
           : priceCents === null
             ? null

@@ -10,9 +10,10 @@
  * - `server-only` is a no-op, and `next/headers` is a cookie jar the test
  *   controls (scripts/lib/next-headers-stub.mjs), so code that reads who is
  *   asking can be asked as anyone.
- * - `next/navigation` and `next/cache` are small stand-ins, so a Server Action
- *   can be called directly: redirect() throws something a test can read, and
- *   revalidatePath() does nothing (scripts/lib/next-*-stub.mjs).
+ * - `next/navigation`, `next/cache` and `next/server` are small stand-ins, so
+ *   a Server Action or a page's query can be called directly: redirect()
+ *   throws something a test can read, and revalidatePath(), refresh() and
+ *   connection() do nothing (scripts/lib/next-*-stub.mjs).
  */
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -34,6 +35,7 @@ const STUBS = {
   "next/headers": "scripts/lib/next-headers-stub.mjs",
   "next/navigation": "scripts/lib/next-navigation-stub.mjs",
   "next/cache": "scripts/lib/next-cache-stub.mjs",
+  "next/server": "scripts/lib/next-server-stub.mjs",
 };
 
 export async function resolve(specifier, context, next) {

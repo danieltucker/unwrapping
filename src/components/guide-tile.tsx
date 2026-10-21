@@ -65,6 +65,12 @@ export function GuideTile({
           ) : (
             <span className="flex-1" />
           )}
+          {/* On a shelf filtered by price, why this list is still here. */}
+          {guide.priceMatches !== null ? (
+            <p className="mb-[5px] text-xs font-semibold text-violet">
+              {guide.priceMatches} {guide.priceMatches === 1 ? "gift" : "gifts"} in your price range
+            </p>
+          ) : null}
           <p className="text-xs font-medium text-ink-62">
             {guide.giftCount} {guide.giftCount === 1 ? "idea" : "ideas"} · by {guide.ownerName}
             {guide.copyCount > 0

@@ -47,6 +47,10 @@ export type PublicItem = {
   /** Stands in for the photo when there is none. */
   emoji: string | null;
   priceCents: number | null;
+  /** The owner's own words for the price, shown in place of "about $X". */
+  priceLabel: string | null;
+  /** Only the site's own currency is compared by the price filter. */
+  currency: string;
   /**
    * What the shop charged when this gift was added, if its price has moved
    * since. Only ever set for a price that came from the shop; see linkInfo.
@@ -199,6 +203,8 @@ export async function getPublicList(
       image: item.images[item.selectedImageIndex] ?? item.images[0] ?? null,
       emoji: item.emoji,
       priceCents: item.priceCents,
+      priceLabel: item.priceLabel,
+      currency: item.currency,
       wasPriceCents: links.get(item.id)?.wasCents ?? null,
       quantity: item.quantity,
       reason: item.reason,

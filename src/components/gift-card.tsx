@@ -3,6 +3,7 @@ import { ChipInDialog } from "@/components/chip-in-dialog";
 import { CopyItemButton } from "@/components/copy-dialog";
 import { FundingBar } from "@/components/funding";
 import { PriceChange } from "@/components/price-change";
+import { PriceTag } from "@/components/price-tag";
 import { ItemImpression } from "@/components/tracking";
 import { fundingLine, isFullyFunded } from "@/lib/funding";
 import {
@@ -100,13 +101,13 @@ export function GiftCard({
               item.title
             )}
           </h3>
-          {item.priceCents !== null ? (
+          {item.priceCents !== null || item.priceLabel ? (
             <span
               className={`whitespace-nowrap font-display text-[1.375rem] ${
                 settled ? "text-ink/55" : ""
               }`}
             >
-              {formatPrice(item.priceCents)}
+              <PriceTag cents={item.priceCents} label={item.priceLabel} />
             </span>
           ) : null}
         </div>

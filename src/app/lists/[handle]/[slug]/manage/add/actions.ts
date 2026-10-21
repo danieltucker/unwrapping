@@ -8,9 +8,10 @@ import { items, type ItemKind } from "@/db/schema";
 import { parseGiftEmoji } from "@/lib/emoji";
 import { requireOwnedList } from "@/lib/list-access";
 import { sourceDomain } from "@/lib/outbound";
+import { PRICE_ERROR, parsePriceInput } from "@/lib/price";
 import { recordPrice } from "@/lib/price-checks";
 import * as routes from "@/lib/routes";
-import { parsePriceToCents, scrapeProduct, type ScrapeResult } from "@/lib/scrape";
+import { scrapeProduct, type ScrapeResult } from "@/lib/scrape";
 
 export type PreviewState = { result?: ScrapeResult; error?: string };
 
@@ -94,13 +95,17 @@ export async function addGift(
   const url =
     kind === "thing" ? String(formData.get("url") ?? "").trim() || null : null;
 
-  const rawPrice = String(formData.get("price") ?? "").trim();
   // An idea is a direction, not a purchase, so it carries no price even if one
-  // were posted in.
-  const priceCents = kind === "idea" || !rawPrice ? null : parsePriceToCents(rawPrice);
-  if (kind !== "idea" && rawPrice && priceCents === null) {
-    return { error: "That price didn't look like a number." };
+  // were posted in. Words like "from $35" are kept as typed and filed under
+  // their number; see parsePriceInput.
+  const price =
+    kind === "idea"
+      ? { cents: null, label: null }
+      : parsePriceInput(String(formData.get("price") ?? ""));
+  if (price === null) {
+    return { error: PRICE_ERROR };
   }
+  const priceCents = price.cents;
 
   // The shop's figure if the box still holds what the scrape put there, the
   // owner's own if they changed it. Only the shop's is kept up to date by the
@@ -167,7 +172,7 @@ export async function addGift(
     kind === "cash" ||
     (kind === "thing" && !guide && formData.get("isGroupGift") === "on");
   const rawGoal = String(formData.get("goal") ?? "").trim();
-  const parsedGoal = rawGoal ? parsePriceToCents(rawGoal) : null;
+  const parsedGoal = rawGoal ? (parsePriceInput(rawGoal)?.cents ?? null) : null;
   if (isGroupGift && rawGoal && parsedGoal === null) {
     return { error: "That goal didn't look like a number." };
   }
@@ -184,6 +189,7 @@ export async function addGift(
     selectedImageIndex,
     emoji,
     priceCents,
+    priceLabel: price.label,
     priceSource,
     currency,
     quantity,

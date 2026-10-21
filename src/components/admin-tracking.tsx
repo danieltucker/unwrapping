@@ -55,8 +55,8 @@ export function AdminTracking({ overview }: { overview: Overview }) {
           {!enabled ? (
             <>
               <strong className="font-semibold">Off.</strong> Buy buttons go straight to the shop and
-              nothing is recorded. Set <code className="font-mono text-xs">EVENT_TRACKING=on</code> and
-              restart to turn it on.
+              nothing is recorded. Remove <code className="font-mono text-xs">EVENT_TRACKING</code> or set
+              it to <code className="font-mono text-xs">on</code>, and restart, to turn it on.
             </>
           ) : paused ? (
             <>

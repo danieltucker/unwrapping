@@ -266,8 +266,18 @@ export const items = sqliteTable(
      * rarely have a picture, and an emoji reads better than "No photo".
      */
     emoji: text("emoji"),
-    /** Integer cents. Null when the scrape found no price, never guessed. */
+    /**
+     * Integer cents. Null when the scrape found no price, never guessed. When
+     * the owner typed a range, the low end. Everything that sorts or filters
+     * by price reads this; see src/lib/price.ts.
+     */
     priceCents: integer("price_cents"),
+    /**
+     * The owner's own words for the price, shown as typed: "from $35",
+     * "$20 to $30". Null when they typed a plain number, or the price came
+     * from the shop, and the page says "about $X" instead.
+     */
+    priceLabel: text("price_label"),
     /**
      * Where the price came from. "scrape" is the shop's own figure, which the
      * monthly recheck keeps up to date; "owner" was typed by hand, and nothing

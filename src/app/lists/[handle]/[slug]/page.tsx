@@ -5,13 +5,16 @@ import { CopyListButton, CopyProvider } from "@/components/copy-dialog";
 import { GiftGrid } from "@/components/gift-grid";
 import { GuideView } from "@/components/guide-view";
 import { IdeaList } from "@/components/idea-list";
+import { PriceFilterBar } from "@/components/price-filter-bar";
 import { ReferralDisclosure } from "@/components/referral-disclosure";
 import { TrackingScope } from "@/components/tracking";
 import { EyeOffIcon } from "@/components/ui";
-import { formatPrice, site } from "@/config/site";
+import { site } from "@/config/site";
 import { getPublicList } from "@/lib/claims";
 import { copyDestinations } from "@/lib/copying";
 import { guideDetails } from "@/lib/guides";
+import { formatAboutRange, matchesPriceFilter, parsePriceFilter } from "@/lib/price";
+import { priceFilterEnabled } from "@/lib/price-filter-flag";
 import { visibility } from "@/lib/visibility";
 import { formatEventDate } from "@/lib/date";
 import * as routes from "@/lib/routes";
@@ -51,12 +54,18 @@ export async function generateMetadata({ params }: PageProps<"/lists/[handle]/[s
 
 export default async function PublicListPage({
   params,
+  searchParams,
 }: PageProps<"/lists/[handle]/[slug]">) {
   const { handle, slug } = await params;
   const view = await getPublicList(handle, slug);
   if (!view) notFound();
 
   const { list, items, stats, viewerIsOwner, ownerHandle } = view;
+  // ?min=&max=&unpriced=, applied here on the server so a filtered link is a
+  // whole page anyone can open, share or go back to. Null while PRICE_FILTER
+  // is off, and the params are then ignored. See src/lib/price.ts.
+  const priceFilter = priceFilterEnabled() ? parsePriceFilter(await searchParams) : null;
+  const path = routes.publicList(list, ownerHandle);
   // The two halves of the page. Ideas keep the owner's ordering among
   // themselves, which is what splitting a single sorted array preserves.
   //
@@ -68,6 +77,14 @@ export default async function PublicListPage({
   const gifts = items.filter(
     (item) => item.kind !== "idea" && item.parentId === null,
   );
+  // TODO(ideas): ideas, and the presents drawn inside them, are shown whatever
+  // the price filter says, as they were before it existed. Once the ideas
+  // feature settles, decide whether an idea whose presents are all out of
+  // range should drop out too; ideaPriceRange in src/lib/price.ts is the
+  // number to decide it with.
+  const shownGifts = priceFilter
+    ? gifts.filter((item) => matchesPriceFilter(item, priceFilter))
+    : gifts;
   const suggestions = new Map(
     ideas.map((idea) => [idea.id, items.filter((item) => item.parentId === idea.id)]),
   );
@@ -103,6 +120,8 @@ export default async function PublicListPage({
             category={details.category}
             copyCount={details.copyCount}
             viewerIsOwner={viewerIsOwner}
+            priceFilter={priceFilter}
+            path={path}
           />
         </CopyProvider>
       </TrackingScope>
@@ -181,7 +200,7 @@ export default async function PublicListPage({
                   value={
                     stats.minCents === null
                       ? "-"
-                      : `${formatPrice(stats.minCents)} – ${formatPrice(stats.maxCents ?? stats.minCents)}`
+                      : formatAboutRange(stats.minCents, stats.maxCents ?? stats.minCents)
                   }
                 />
                 <Stat label="The owner can see" value={promise.ownerSees} highlight />
@@ -220,15 +239,26 @@ export default async function PublicListPage({
                   {/* The presents keep the filters and the sort; an idea has no
                       price to sort by and can never be taken, so it would sit out
                       every one of them. */}
+                  {priceFilter && gifts.length > 0 ? (
+                    <PriceFilterBar
+                      path={path}
+                      filter={priceFilter}
+                      shown={shownGifts.length}
+                      total={gifts.length}
+                      noun={["gift", "gifts"]}
+                    />
+                  ) : null}
+
                   {gifts.length > 0 ? (
                     <GiftGrid
-                      items={gifts}
+                      items={shownGifts}
                       handle={handle}
                       listKey={slug}
                       claimRule={list.claimRule}
                       viewerIsOwner={viewerIsOwner}
                       signedIn={signedIn}
                       surpriseMode={list.surpriseMode}
+                      affordableChip={priceFilter === null}
                     />
                   ) : null}
 

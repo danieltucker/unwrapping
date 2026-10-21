@@ -7,3 +7,6 @@ export const revalidated = (globalThis.__testRevalidated ??= []);
 export function revalidatePath(path) {
   revalidated.push(path);
 }
+
+/** Re-renders the current page in Next. Nothing to re-render here. */
+export function refresh() {}

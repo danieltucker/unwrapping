@@ -2,13 +2,14 @@
 
 What people do on lists — which lists are viewed, which gifts are seen, which
 get clicked through to a shop — recorded without recording who did it.
-Switched off by default.
+Switched on by default.
 
-## Turning it on
+## Turning it off
 
-Set `EVENT_TRACKING=on` and restart. No rebuild. With it off, buy buttons link
-straight to the shop as they always have, no tracking cookie is set and the
-browser sends nothing.
+Set `EVENT_TRACKING=off` and restart. No rebuild. Unset means on; any value
+other than `on`, `1`, `true` or `off` also counts as off, so a typo fails
+closed. With it off, buy buttons link straight to the shop as they always
+have, no tracking cookie is set and the browser sends nothing.
 
 To stop recording without a restart, use **Pause recording** in the Tracking
 section of `/admin`. Links keep going through `/go` while paused; only the
@@ -22,7 +23,7 @@ One row in `item_events` per event:
 |---|---|---|
 | `list_view` | browser | a list or gift guide page opens |
 | `item_impression` | browser | at least half of a gift or idea card is on screen; once per gift per page view |
-| `filter_used`, `sort_used` | browser | a guest changes the grid's filter or sort |
+| `filter_used`, `sort_used` | browser | a guest changes the grid's filter or sort, or uses the price filter (a chip, Apply or Clear filters; opening a filtered link doesn't count). Only on a list page, not on a /gifts shelf |
 | `suggestion_impression`, `suggestion_click` | browser | a gift guide tile on the home page or /gifts is seen or opened |
 | `outbound_click` | server | a buy button is followed, through `/go/<itemId>` |
 | `item_claim` | server | a gift is reserved |

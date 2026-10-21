@@ -1,9 +1,13 @@
 /**
  * The switch for event tracking, read from EVENT_TRACKING when it is asked, so
- * an operator turns it on with an environment variable and a restart, not a
+ * an operator turns it off with an environment variable and a restart, not a
  * build.
  *
- * Off unless it says "on". Off means the feature isn't there: buy buttons link
+ * On unless it says "off" (or "0", "false"); unset is on. Anything else it
+ * doesn't recognise reads as off, like SECRET_SANTA: a typo in a switch that
+ * sets cookies should fail closed.
+ *
+ * Off means the feature isn't there: buy buttons link
  * straight to the shop as they always did, no tracking cookie is set, the
  * browser sends nothing, and /api/events stores nothing. /go/<itemId> still
  * redirects, because a link someone copied while it was on should keep working.
@@ -14,8 +18,8 @@
  * Pure, with no server-only import, so tests and the route handlers share it.
  */
 export function trackingEnabled(): boolean {
-  const value = (process.env.EVENT_TRACKING ?? "").trim().toLowerCase();
-  return value === "on" || value === "1" || value === "true";
+  const value = (process.env.EVENT_TRACKING ?? "on").trim().toLowerCase();
+  return value === "" || value === "on" || value === "1" || value === "true";
 }
 
 /** Where a buy button was pressed from, for outbound_click. */

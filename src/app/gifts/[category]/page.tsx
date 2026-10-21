@@ -3,9 +3,15 @@ import { notFound } from "next/navigation";
 
 import { BrowseBanner, CategoryChips, MakeOneCta } from "@/components/gift-browse";
 import { GuideGrid, GuideTile } from "@/components/guide-tile";
+import { PriceFilterBar } from "@/components/price-filter-bar";
 import { site } from "@/config/site";
 import { allCategories, categoryBySlug, publishedGuides } from "@/lib/guides";
+import { isPriceFilterActive, parsePriceFilter } from "@/lib/price";
+import { priceFilterEnabled } from "@/lib/price-filter-flag";
 import * as routes from "@/lib/routes";
+
+/** As many guides as one shelf shows. */
+const SHELF_SIZE = 60;
 
 export async function generateMetadata({
   params,
@@ -18,19 +24,41 @@ export async function generateMetadata({
     description:
       category.description ||
       `Gift lists for ${category.name.toLowerCase()}, picked by people who know, on ${site.name}.`,
+    // A filtered shelf is the same shelf: every ?min=&max= points search
+    // engines back here rather than competing with it.
     alternates: { canonical: routes.giftCategory(category.slug) },
   };
 }
 
-/** One shelf of /gifts: every published guide filed under this category. */
-export default async function GiftCategoryPage({ params }: PageProps<"/gifts/[category]">) {
+/**
+ * One shelf of /gifts: every published guide filed under this category.
+ *
+ * The price filter keeps a guide when at least one of its presents is in the
+ * range, and the tile says how many, so someone shopping to a budget lands on
+ * lists that have something for them. Filtered on the server from the
+ * address, like a list's own filter; see PriceFilterBar.
+ */
+export default async function GiftCategoryPage({
+  params,
+  searchParams,
+}: PageProps<"/gifts/[category]">) {
   const category = await categoryBySlug((await params).category);
   if (!category) notFound();
 
-  const [categories, guides] = await Promise.all([
+  const price = priceFilterEnabled() ? parsePriceFilter(await searchParams) : null;
+  const filtering = price !== null && isPriceFilterActive(price);
+
+  const [categories, everything, guides] = await Promise.all([
     allCategories(),
-    publishedGuides({ categoryId: category.id, limit: 60 }),
+    publishedGuides({ categoryId: category.id, limit: SHELF_SIZE }),
+    // The unfiltered shelf is the "of N" in the count; only read twice when
+    // there is a filter to compare it with.
+    filtering
+      ? publishedGuides({ categoryId: category.id, limit: SHELF_SIZE, price })
+      : null,
   ]);
+  const shown = guides ?? everything;
+  const path = routes.giftCategory(category.slug);
 
   return (
     <main className="w-full flex-1">
@@ -46,14 +74,30 @@ export default async function GiftCategoryPage({ params }: PageProps<"/gifts/[ca
       <div className="mx-auto max-w-[72rem] px-[1.375rem] py-10 sm:px-8 lg:px-10">
         <CategoryChips categories={categories} current={category.slug} />
 
-        {guides.length === 0 ? (
+        {price && everything.length > 0 ? (
+          <div className="mt-8">
+            <PriceFilterBar
+              path={path}
+              filter={price}
+              shown={shown.length}
+              total={everything.length}
+              noun={["gift list", "gift lists"]}
+            />
+          </div>
+        ) : null}
+
+        {everything.length === 0 ? (
           <p className="mt-8 rounded-card border border-dashed border-ink-line-strong px-6 py-14 text-center text-sm text-ink-72">
             Nothing on this shelf yet. Make the first {category.name.toLowerCase()} gift list.
           </p>
+        ) : shown.length === 0 ? (
+          <p className="rounded-card border border-dashed border-ink-line-strong px-6 py-14 text-center text-sm text-ink-72">
+            None of these lists has a gift in that price range yet. Try a wider one, or clear the filter.
+          </p>
         ) : (
-          <div className="mt-8">
+          <div className={price ? undefined : "mt-8"}>
             <GuideGrid>
-              {guides.map((guide) => (
+              {shown.map((guide) => (
                 <GuideTile key={guide.id} guide={guide} showCategory={false} surface="category" />
               ))}
             </GuideGrid>

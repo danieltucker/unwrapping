@@ -25,7 +25,7 @@ const schema = await import("../src/db/schema.ts");
 const { parseBatch, validateEvent, MAX_EVENTS_PER_BATCH } = await import("../src/lib/event-validation.ts");
 const { isBotUserAgent } = await import("../src/lib/bot.ts");
 const { RateLimiter } = await import("../src/lib/rate-limit.ts");
-const { buyLink, placed } = await import("../src/lib/tracking-flag.ts");
+const { buyLink, placed, trackingEnabled } = await import("../src/lib/tracking-flag.ts");
 const tracking = await import("../src/lib/tracking.ts");
 const { pruneEvents } = await import("../src/lib/event-retention.ts");
 const { createSession } = await import("../src/lib/session.ts");
@@ -115,6 +115,23 @@ const cash = addItem({ listId: wishlist.id, kind: "cash", url: null });
 const idea = addItem({ listId: wishlist.id, kind: "idea" });
 const child = addItem({ listId: wishlist.id, parentId: idea.id, url: "https://shop.example/needles" });
 const guideTagged = addItem({ listId: guide.id, url: "https://www.amazon.com/dp/B000GUID?tag=friend-20" });
+
+/* -------------------------------------------------------------------------- */
+section("The flag");
+/* -------------------------------------------------------------------------- */
+{
+  const flag = (value: string | undefined) => {
+    if (value === undefined) delete process.env.EVENT_TRACKING;
+    else process.env.EVENT_TRACKING = value;
+    return trackingEnabled();
+  };
+  check("unset is on", flag(undefined));
+  check("empty is on", flag(""));
+  check("on, 1 and true are on", flag("on") && flag(" ON ") && flag("1") && flag("true"));
+  check("off, 0 and false are off", !flag("off") && !flag("0") && !flag("false"));
+  check("a typo is off", !flag("onn"));
+  process.env.EVENT_TRACKING = "on";
+}
 
 /* -------------------------------------------------------------------------- */
 section("Validation");

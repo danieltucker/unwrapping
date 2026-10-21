@@ -1,11 +1,12 @@
 import { CardPhoto } from "@/components/card-photo";
 import { CopyItemButton } from "@/components/copy-dialog";
 import { BoughtButton, ReleaseButton, ReserveDialog } from "@/components/reserve-dialog";
+import { IdeaRange } from "@/components/price-tag";
 import { ItemImpression } from "@/components/tracking";
-import { formatPrice } from "@/config/site";
 import type { ClaimRule } from "@/db/schema";
 import type { PublicItem } from "@/lib/claims";
 import { isStillOpen } from "@/lib/funding";
+import { priceText } from "@/lib/price";
 import { placed } from "@/lib/tracking-flag";
 
 /**
@@ -184,6 +185,7 @@ function Suggestions({
             ? "One that fits"
             : `${suggestions.length} that fit`
           : `${free} of ${suggestions.length} still free`}
+        <IdeaRange suggestions={suggestions} />
       </p>
 
       <ul className="flex flex-col gap-[7px]">
@@ -273,10 +275,7 @@ function SuggestionRow({
               : "You're getting this"
             : gone
               ? "Taken care of"
-              : [
-                  item.priceCents === null ? null : formatPrice(item.priceCents),
-                  item.sourceDomain,
-                ]
+              : [priceText(item), item.sourceDomain]
                   .filter(Boolean)
                   .join(" · ") || "No price listed"}
         </span>

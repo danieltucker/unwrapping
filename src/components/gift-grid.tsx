@@ -27,6 +27,11 @@ const MATCHES: Record<Filter, (item: PublicItem) => boolean> = {
  * The guest's view of the gifts: filters and sorting, both client-side over the
  * list already on the page. Nothing here re-queries, so nothing here can leak
  * more than the server already decided this viewer may see.
+ *
+ * Price is the exception, and isn't here: the price filter above the grid
+ * lives in the address and is applied on the server before `items` arrives
+ * (see PriceFilterBar). The old "Under $50" chip only comes back while that
+ * filter is switched off with PRICE_FILTER.
  */
 export function GiftGrid({
   items,
@@ -36,6 +41,7 @@ export function GiftGrid({
   viewerIsOwner,
   signedIn,
   surpriseMode,
+  affordableChip = false,
 }: {
   items: PublicItem[];
   handle: string;
@@ -44,6 +50,8 @@ export function GiftGrid({
   viewerIsOwner: boolean;
   signedIn: boolean;
   surpriseMode: boolean;
+  /** Offer "Under $50" here; only while the price filter bar is off. */
+  affordableChip?: boolean;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("owner");
@@ -91,6 +99,7 @@ export function GiftGrid({
         {(Object.keys(MATCHES) as Filter[]).map((key) => {
           const count = items.filter(MATCHES[key]).length;
           if (key !== "all" && count === 0) return null;
+          if (key === "affordable" && !affordableChip) return null;
 
           return (
             <button
@@ -127,7 +136,9 @@ export function GiftGrid({
 
       {sorted.length === 0 ? (
         <p className="rounded-card border border-dashed border-ink-line-strong px-6 py-16 text-center text-sm text-ink-72">
-          Nothing matches that filter.
+          {items.length === 0
+            ? "No gifts in that price range. Try a wider one, or clear the filter."
+            : "Nothing matches that filter."}
         </p>
       ) : (
         <ul className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-3">

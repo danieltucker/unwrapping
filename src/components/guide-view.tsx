@@ -3,12 +3,20 @@ import Link from "next/link";
 import { CardPhoto } from "@/components/card-photo";
 import { CopyItemButton, CopyListButton } from "@/components/copy-dialog";
 import { PriceChange } from "@/components/price-change";
+import { PriceFilterBar } from "@/components/price-filter-bar";
+import { IdeaRange, PriceTag } from "@/components/price-tag";
 import { ReferralDisclosure } from "@/components/referral-disclosure";
 import { ItemImpression } from "@/components/tracking";
 import { Avatar, EyeOffIcon } from "@/components/ui";
-import { formatPrice } from "@/config/site";
 import type { Category, List } from "@/db/schema";
 import type { PublicItem } from "@/lib/claims";
+import {
+  formatAboutRange,
+  isPriceFilterActive,
+  matchesPriceFilter,
+  priceText,
+  type PriceFilter,
+} from "@/lib/price";
 import * as routes from "@/lib/routes";
 import { placed } from "@/lib/tracking-flag";
 
@@ -31,6 +39,8 @@ export function GuideView({
   category,
   copyCount,
   viewerIsOwner,
+  priceFilter,
+  path,
 }: {
   list: List;
   items: PublicItem[];
@@ -39,9 +49,22 @@ export function GuideView({
   category: Pick<Category, "slug" | "name" | "emoji"> | null;
   copyCount: number;
   viewerIsOwner: boolean;
+  /** Null while PRICE_FILTER is off: no bar, nothing filtered. */
+  priceFilter: PriceFilter | null;
+  /** This page's own address, which the filter's links and form point at. */
+  path: string;
 }) {
   const ideas = items.filter((item) => item.kind === "idea");
   const gifts = items.filter((item) => item.kind !== "idea" && item.parentId === null);
+  // Filtered on the server, so a filtered link is a page a crawler can read.
+  // TODO(ideas): ideas and the picks under them are shown whatever the filter
+  // says, as they always have been. Once ideas settle, decide whether an idea
+  // whose picks are all out of range should drop out too; ideaPriceRange is
+  // the number to decide it with.
+  const shownGifts = priceFilter
+    ? gifts.filter((item) => matchesPriceFilter(item, priceFilter))
+    : gifts;
+  const filtering = priceFilter !== null && isPriceFilterActive(priceFilter);
   const childrenOf = (id: string) => items.filter((item) => item.parentId === id);
 
   const prices = items
@@ -120,7 +143,7 @@ export function GuideView({
               value={
                 prices.length === 0
                   ? "-"
-                  : `${formatPrice(Math.min(...prices))} – ${formatPrice(Math.max(...prices))}`
+                  : formatAboutRange(Math.min(...prices), Math.max(...prices))
               }
             />
             {copyCount > 0 ? (
@@ -157,12 +180,26 @@ export function GuideView({
             </p>
           ) : (
             <>
-              {gifts.length > 0 ? (
+              {priceFilter && gifts.length > 0 ? (
+                <PriceFilterBar
+                  path={path}
+                  filter={priceFilter}
+                  shown={shownGifts.length}
+                  total={gifts.length}
+                  noun={["gift", "gifts"]}
+                />
+              ) : null}
+
+              {shownGifts.length > 0 ? (
                 <ul className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-3">
-                  {gifts.map((item) => (
+                  {shownGifts.map((item) => (
                     <GuideGiftCard key={item.id} item={item} />
                   ))}
                 </ul>
+              ) : filtering ? (
+                <p className="rounded-card border border-dashed border-ink-line-strong px-6 py-14 text-center text-sm text-ink-72">
+                  No gifts in that price range. Try a wider one, or clear the filter.
+                </p>
               ) : null}
 
               {ideas.length > 0 ? (
@@ -227,9 +264,9 @@ function GuideGiftCard({ item }: { item: PublicItem }) {
               item.title
             )}
           </h3>
-          {item.priceCents !== null ? (
+          {item.priceCents !== null || item.priceLabel ? (
             <span className="whitespace-nowrap font-display text-[1.375rem]">
-              {formatPrice(item.priceCents)}
+              <PriceTag cents={item.priceCents} label={item.priceLabel} />
             </span>
           ) : null}
         </div>
@@ -298,6 +335,7 @@ function GuideIdeaCard({
           <div className="mb-[10px] border-t border-ink-line pt-[13px]">
             <p className="mb-[9px] text-2xs font-semibold uppercase tracking-[1.3px] text-ink-62">
               {suggestions.length === 1 ? "One that fits" : `${suggestions.length} that fit`}
+              <IdeaRange suggestions={suggestions} />
             </p>
             <ul className="flex flex-col gap-[7px]">
               {suggestions.map((suggestion) => (
@@ -330,10 +368,7 @@ function GuideIdeaCard({
                       )}
                     </span>
                     <span className="block text-2xs leading-[1.4] text-ink-62">
-                      {[
-                        suggestion.priceCents === null ? null : formatPrice(suggestion.priceCents),
-                        suggestion.sourceDomain,
-                      ]
+                      {[priceText(suggestion), suggestion.sourceDomain]
                         .filter(Boolean)
                         .join(" · ") || "No price listed"}
                     </span>
