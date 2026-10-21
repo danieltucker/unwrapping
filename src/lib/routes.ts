@@ -67,6 +67,6 @@ export const profile = "/profile";
 
 /**
  * The operator's screen: every account, list and photo on this instance.
- * Reachable only by whoever is named in ADMIN_EMAILS; see `src/lib/admin.ts`.
+ * Reachable only by administrators; see `src/lib/admin.ts`.
  */
 export const admin = "/admin";

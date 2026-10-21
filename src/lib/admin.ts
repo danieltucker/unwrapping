@@ -7,14 +7,16 @@ import { getCurrentUser } from "@/lib/session";
 /**
  * Who is allowed into /admin.
  *
- * Deliberately an environment variable rather than a column on `users`: the
- * person who can set it is the person who runs the instance, which is the only
- * honest definition of an administrator here. A flag in the database would have
- * to be turned on by editing the database anyway — there is nobody to grant it
- * — and it would then be reachable by anything that can write a row.
+ * Two ways in. The people named in the ADMIN_EMAILS environment variable are
+ * the root of it: whoever can set that runs the instance, and nothing on the
+ * screen can take it away from them, so an administrator can never lock the
+ * operator out. Anybody else is an administrator because one of those people
+ * — or someone they made one — switched on `users.isAdmin` from the Accounts
+ * section, and can be switched off again the same way.
  *
- * Unset means nobody, so a self-hosted instance that never heard of this has no
- * admin screen rather than an unguarded one. See .env.example.
+ * Unset and with nobody flagged means nobody, so a self-hosted instance that
+ * never heard of this has no admin screen rather than an unguarded one. See
+ * .env.example.
  */
 const admins = new Set(
   (process.env.ADMIN_EMAILS ?? "")
@@ -23,15 +25,23 @@ const admins = new Set(
     .filter(Boolean),
 );
 
-/** Emails are stored lowercased at sign-up; compared that way here too. */
+/**
+ * Named in ADMIN_EMAILS. Emails are stored lowercased at sign-up; compared
+ * that way here too.
+ */
 export function isAdminEmail(email: string): boolean {
   return admins.has(email.trim().toLowerCase());
+}
+
+/** Either way in: named in ADMIN_EMAILS, or granted from the admin screen. */
+export function isAdmin(user: { email: string; isAdmin: boolean }): boolean {
+  return user.isAdmin || isAdminEmail(user.email);
 }
 
 /** The signed-in administrator, or null for everybody else. */
 export async function adminOrNull() {
   const user = await getCurrentUser();
-  return user && isAdminEmail(user.email) ? user : null;
+  return user && isAdmin(user) ? user : null;
 }
 
 /**

@@ -45,6 +45,18 @@ export const users = sqliteTable("users", {
    */
   birthday: integer("birthday", { mode: "timestamp" }),
   passwordHash: text("password_hash").notNull(),
+  /**
+   * Granted from /admin by another administrator. The people named in
+   * ADMIN_EMAILS are administrators whatever this says, and are the only ones
+   * the screen can't take it away from — see src/lib/admin.ts.
+   */
+  isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
+  /**
+   * Set by an administrator; null for everybody in good standing. A banned
+   * account can't sign in, its sessions are gone, and its lists answer 404 to
+   * everyone — but nothing is deleted, so lifting the ban puts it all back.
+   */
+  bannedAt: integer("banned_at", { mode: "timestamp" }),
   createdAt: createdAt(),
 });
 
@@ -407,6 +419,27 @@ export const priceHistory = sqliteTable(
   },
   (t) => [index("price_history_url_idx").on(t.url, t.observedAt)],
 );
+
+/**
+ * Who put each file in data/uploads there, so the admin screen can say whose a
+ * photo is even once nothing shows it any more.
+ *
+ * The directory is still the index of what exists — see listUploads — and this
+ * only annotates it. Files uploaded before this table existed have no row, and
+ * the admin screen falls back to the earliest gift showing them.
+ */
+export const uploads = sqliteTable("uploads", {
+  /** The stored file name, as in /uploads/<name>. */
+  name: text("name").primaryKey(),
+  /**
+   * The account that uploaded it. Null for an anonymous draft's owner, who has
+   * no account yet; the list below says whose it became.
+   */
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+  /** The list it was uploaded to. Null for a profile photo. */
+  listId: text("list_id").references(() => lists.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+});
 
 export type User = typeof users.$inferSelect;
 export type Category = typeof categories.$inferSelect;

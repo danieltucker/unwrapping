@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -7,21 +7,35 @@ import {
   checkLinksNow,
   deleteAccount,
   deleteCategory,
-  deleteImage,
   deleteList,
+  setAdmin,
+  setBanned,
 } from "@/app/admin/actions";
 import { AdminActionButton } from "@/components/admin-action-button";
 import { AdminDelete } from "@/components/admin-delete";
+import {
+  AdminPhotoGallery,
+  type GalleryList,
+  type GalleryPerson,
+  type GalleryPhoto,
+} from "@/components/admin-photo-gallery";
 import { CategoryForm, CategoryRow } from "@/components/category-form";
 import { Avatar, CapsLabel } from "@/components/ui";
 import { db } from "@/db";
-import { items, lists, users } from "@/db/schema";
-import { requireAdmin } from "@/lib/admin";
+import {
+  items,
+  lists,
+  uploads as uploadRecords,
+  users,
+  type List,
+  type User,
+} from "@/db/schema";
+import { isAdmin, isAdminEmail, requireAdmin } from "@/lib/admin";
 import { allCategories } from "@/lib/guides";
 import { linkHealth, priceCheckState } from "@/lib/price-checks";
 import { displayHost } from "@/lib/origin";
 import * as routes from "@/lib/routes";
-import { listUploads } from "@/lib/uploads";
+import { listUploads, type StoredUpload } from "@/lib/uploads";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -35,20 +49,20 @@ export const metadata: Metadata = {
  * accounts, lists, and the photos on disk. Above them, the one thing here that
  * is curated rather than cleaned up: the categories gift guides are filed under.
  *
- * Reachable only by whoever the operator named in ADMIN_EMAILS — see
- * `src/lib/admin.ts` for why that is an environment variable rather than a
- * column. Nobody else gets a 403; they get the 404 they would get for a list
- * that isn't theirs, because a signed-in stranger shouldn't learn this screen
- * exists.
+ * Reachable only by administrators: whoever the operator named in ADMIN_EMAILS,
+ * and whoever they have made one from the Accounts section — see
+ * `src/lib/admin.ts`. Nobody else gets a 403; they get the 404 they would get
+ * for a list that isn't theirs, because a signed-in stranger shouldn't learn
+ * this screen exists.
  *
  * Deliberately one page rather than three. An operator comes here to answer
  * "what is in here, and what is taking up room", and a photo that belongs to
  * nothing is only recognisable next to the lists it isn't on.
  */
 export default async function AdminPage() {
-  await requireAdmin();
+  const me = await requireAdmin();
 
-  const [categoryRows, links, accounts, allLists, uploads, photoOwners, avatarOwners] = await Promise.all([
+  const [categoryRows, links, accounts, allLists, uploads, photoOwners, uploadRows] = await Promise.all([
     allCategories(),
     linkHealth(),
 
@@ -62,6 +76,7 @@ export default async function AdminPage() {
         list: lists,
         ownerHandle: users.handle,
         ownerName: users.name,
+        ownerBanned: sql<boolean>`${users.bannedAt} is not null`.mapWith(Boolean),
         giftCount: sql<number>`(select count(*) from ${items} where ${items.listId} = ${lists.id})`,
       })
       .from(lists)
@@ -73,13 +88,16 @@ export default async function AdminPage() {
 
     // What each file on disk is actually drawing, so "is this safe to delete"
     // is answered on the page rather than guessed at.
+    // Oldest first, so the first gift found showing a file is where it was
+    // originally uploaded — copies of a list share their photos' URLs.
     db
-      .select({ title: items.title, images: items.images, listName: lists.name })
+      .select({ title: items.title, images: items.images, listId: items.listId })
       .from(items)
-      .innerJoin(lists, eq(lists.id, items.listId))
+      .orderBy(asc(items.createdAt))
       .all(),
 
-    db.select({ name: users.name, avatarUrl: users.avatarUrl }).from(users).all(),
+    // Who uploaded what, for files uploaded since that was recorded.
+    db.select().from(uploadRecords).all(),
   ]);
 
   /**
@@ -100,24 +118,17 @@ export default async function AdminPage() {
     owned.set(list.ownerId, tally);
   }
 
-  /** Upload URL → every place it appears, in the words the operator would use. */
-  const usedBy = new Map<string, string[]>();
-  const note = (url: string, where: string) => {
-    const existing = usedBy.get(url);
-    if (existing) existing.push(where);
-    else usedBy.set(url, [where]);
-  };
-
-  for (const { title, images, listName } of photoOwners) {
-    // Every candidate counts, not only the selected one: the others are still
-    // on disk and the owner can still switch to them.
-    for (const url of images) note(url, `${title} — ${listName}`);
-  }
-  for (const { name, avatarUrl } of avatarOwners) {
-    if (avatarUrl) note(avatarUrl, `${name}’s profile photo`);
-  }
-
-  const orphans = uploads.filter((upload) => !usedBy.has(upload.url));
+  const photos = galleryPhotos({
+    uploads,
+    photoOwners,
+    uploadRows,
+    accounts,
+    allLists,
+    meId: me.id,
+  });
+  const orphanCount = photos.filter(
+    (photo) => photo.lists.length === 0 && photo.profileOf.length === 0,
+  ).length;
   const checks = priceCheckState();
   const totalBytes = uploads.reduce((sum, upload) => sum + upload.bytes, 0);
 
@@ -213,13 +224,21 @@ export default async function AdminPage() {
         {accounts.map((user) => {
           const { lists: listCount, gifts: giftCount } =
             owned.get(user.id) ?? { lists: 0, gifts: 0 };
+          const self = user.id === me.id;
+          const root = isAdminEmail(user.email);
+          const admin = isAdmin(user);
 
           return (
             <Row key={user.id}>
               <Avatar name={user.name} url={user.avatarUrl} size={36} />
 
               <div className="min-w-0 flex-1">
-                <p className="truncate text-base font-semibold">{user.name}</p>
+                <p className="truncate text-base font-semibold">
+                  {user.name}
+                  {self ? <Pill tone="ink">You</Pill> : null}
+                  {admin ? <Pill tone="violet">{root ? "Admin · ADMIN_EMAILS" : "Admin"}</Pill> : null}
+                  {user.bannedAt ? <Pill tone="rose">Banned {stamp(user.bannedAt)}</Pill> : null}
+                </p>
                 <p className="truncate text-xs text-ink-72">{user.email}</p>
                 <p className="mt-0.5 truncate text-xs text-ink-62">
                   /lists/{user.handle} · {plural(listCount, "list")} ·{" "}
@@ -227,26 +246,63 @@ export default async function AdminPage() {
                 </p>
               </div>
 
-              <AdminDelete
-                action={deleteAccount}
-                fields={{ userId: user.id }}
-                label="Delete account"
-                prompt={
-                  listCount > 0
-                    ? `Delete ${user.name} and ${plural(listCount, "list")} with ${plural(
-                        giftCount,
-                        "gift",
-                      )} on them? Everyone who reserved one of those gifts loses that reservation.`
-                    : `Delete ${user.name}? They have no lists.`
-                }
-              />
+              <div className="flex flex-wrap items-start justify-end gap-2">
+                {/* ADMIN_EMAILS is the operator's say-so and can't be undone
+                    from here; nor can your own access, or a banned account be
+                    promoted. setAdmin refuses all three regardless. */}
+                {root || user.bannedAt || (self && admin) ? null : (
+                  <AdminActionButton
+                    action={setAdmin}
+                    fields={admin ? { userId: user.id } : { userId: user.id, grant: "on" }}
+                    label={admin ? "Remove admin" : "Make admin"}
+                    busyLabel="Saving…"
+                  />
+                )}
+
+                {user.bannedAt ? (
+                  <AdminActionButton
+                    action={setBanned}
+                    fields={{ userId: user.id }}
+                    label="Lift ban"
+                    busyLabel="Lifting…"
+                  />
+                ) : self || admin ? null : (
+                  <AdminDelete
+                    action={setBanned}
+                    fields={{ userId: user.id, ban: "on" }}
+                    label="Ban"
+                    confirmLabel="Ban"
+                    busyLabel="Banning…"
+                    prompt={`Ban ${user.name}? They're signed out and can't sign back in, and their ${plural(
+                      listCount,
+                      "list",
+                    )} go offline. Nothing is deleted, and lifting the ban puts it all back.`}
+                  />
+                )}
+
+                {self ? null : (
+                  <AdminDelete
+                    action={deleteAccount}
+                    fields={{ userId: user.id }}
+                    label="Delete account"
+                    prompt={
+                      listCount > 0
+                        ? `Delete ${user.name} and ${plural(listCount, "list")} with ${plural(
+                            giftCount,
+                            "gift",
+                          )} on them? Everyone who reserved one of those gifts loses that reservation.`
+                        : `Delete ${user.name}? They have no lists.`
+                    }
+                  />
+                )}
+              </div>
             </Row>
           );
         })}
       </Section>
 
       <Section title="Lists" count={allLists.length} empty="No lists yet.">
-        {allLists.map(({ list, ownerHandle, ownerName, giftCount }) => {
+        {allLists.map(({ list, ownerHandle, ownerName, ownerBanned, giftCount }) => {
           const path = routes.publicList(list, ownerHandle);
           const short = routes.shortLink(list);
 
@@ -278,6 +334,10 @@ export default async function AdminPage() {
                   {ownerName ? (
                     <>
                       {ownerName} (/lists/{ownerHandle})
+                      {ownerBanned ? (
+                        // Offline for everyone but this screen while the ban stands.
+                        <span className="font-semibold text-rose"> · owner banned</span>
+                      ) : null}
                     </>
                   ) : (
                     // No owner: started anonymously and never claimed, so it
@@ -306,72 +366,154 @@ export default async function AdminPage() {
 
       <Section
         title="Photos"
-        count={uploads.length}
+        count={photos.length}
         empty="Nothing has been uploaded yet."
         note={
-          uploads.length > 0
-            ? `${fileSize(totalBytes)} in data/uploads · ${orphans.length} used by nothing`
+          photos.length > 0
+            ? `${fileSize(totalBytes)} in data/uploads · ${orphanCount} used by nothing`
             : undefined
         }
+        bare
       >
-        {uploads.map((upload) => {
-          const places = usedBy.get(upload.url);
-
-          return (
-            <Row key={upload.name}>
-              {/* Not next/image: these are served by a route handler from
-                  outside `public/`, and the optimizer has nothing to gain on a
-                  thumbnail of a file already on this disk. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={upload.url}
-                alt=""
-                className="h-14 w-14 shrink-0 rounded-control border border-ink-line object-cover"
-              />
-
-              <div className="min-w-0 flex-1">
-                {places ? (
-                  <>
-                    <p className="truncate text-sm font-semibold">{places[0]}</p>
-                    {places.length > 1 ? (
-                      <p className="text-xs text-ink-72">
-                        and {plural(places.length - 1, "other place")}
-                      </p>
-                    ) : null}
-                  </>
-                ) : (
-                  <p className="text-sm font-semibold text-amber">Used by nothing</p>
-                )}
-                <p className="mt-0.5 truncate text-xs text-ink-62">
-                  {fileSize(upload.bytes)} · uploaded {stamp(upload.uploadedAt)} ·{" "}
-                  <span className="font-mono">{upload.name}</span>
-                </p>
-              </div>
-
-              <AdminDelete
-                action={deleteImage}
-                fields={{ name: upload.name }}
-                label="Delete photo"
-                prompt={
-                  places
-                    ? `Delete this file? It is taken out of ${plural(
-                        places.length,
-                        "place",
-                      )} showing it, and each of those falls back to an emoji or initials.`
-                    : "Delete this file? Nothing is showing it."
-                }
-              />
-            </Row>
-          );
-        })}
+        <AdminPhotoGallery photos={photos} />
       </Section>
     </main>
   );
 }
 
+/**
+ * Every file on disk, with who put it there and where it is shown, in the shape
+ * the gallery draws.
+ *
+ * Who uploaded it comes from the upload's own row where there is one. Files
+ * from before those were recorded fall back to the earliest gift showing them —
+ * copying a list copies its photos' URLs, so later uses are other people's
+ * copies — and then to a profile photo.
+ */
+function galleryPhotos({
+  uploads,
+  photoOwners,
+  uploadRows,
+  accounts,
+  allLists,
+  meId,
+}: {
+  uploads: StoredUpload[];
+  /** Oldest first. */
+  photoOwners: { title: string; images: string[]; listId: string }[];
+  uploadRows: (typeof uploadRecords.$inferSelect)[];
+  accounts: User[];
+  allLists: {
+    list: List;
+    ownerHandle: string | null;
+    ownerName: string | null;
+    ownerBanned: boolean;
+    giftCount: number;
+  }[];
+  meId: string;
+}): GalleryPhoto[] {
+  const people = new Map(accounts.map((user) => [user.id, user]));
+  const listsById = new Map(allLists.map((row) => [row.list.id, row]));
+  const recorded = new Map(uploadRows.map((row) => [row.name, row]));
+
+  const person = (id: string | null | undefined): GalleryPerson | null => {
+    const user = id ? people.get(id) : undefined;
+    if (!user) return null;
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      banned: user.bannedAt !== null,
+      admin: isAdmin(user),
+      self: user.id === meId,
+    };
+  };
+
+  /** Upload URL → list id → the gifts on that list showing it, first use first. */
+  const shownOn = new Map<string, Map<string, string[]>>();
+  for (const { title, images, listId } of photoOwners) {
+    // Every candidate counts, not only the selected one: the others are still
+    // on disk and the owner can still switch to them.
+    for (const url of new Set(images)) {
+      const byList = shownOn.get(url) ?? new Map<string, string[]>();
+      byList.set(listId, [...(byList.get(listId) ?? []), title]);
+      shownOn.set(url, byList);
+    }
+  }
+
+  const avatars = new Map<string, User[]>();
+  for (const user of accounts) {
+    if (user.avatarUrl) avatars.set(user.avatarUrl, [...(avatars.get(user.avatarUrl) ?? []), user]);
+  }
+
+  return uploads.map((upload) => {
+    const shownLists: GalleryList[] = [...(shownOn.get(upload.url) ?? [])].flatMap(
+      ([listId, gifts]) => {
+        const row = listsById.get(listId);
+        if (!row) return [];
+        return [
+          {
+            id: row.list.id,
+            name: row.list.name,
+            emoji: row.list.emoji,
+            href: routes.publicList(row.list, row.ownerHandle),
+            ownerName: row.ownerName,
+            ownerBanned: row.ownerBanned,
+            giftCount: row.giftCount,
+            gifts,
+          },
+        ];
+      },
+    );
+    const profiles = avatars.get(upload.url) ?? [];
+
+    let uploader: GalleryPerson | null;
+    let uploaderSource: GalleryPhoto["uploaderSource"];
+    const record = recorded.get(upload.name);
+
+    if (record) {
+      // A draft's upload has no account on it, but the list knows whose it
+      // became once they signed up.
+      const list = record.listId ? listsById.get(record.listId)?.list : undefined;
+      uploader = person(record.userId ?? list?.ownerId);
+      uploaderSource = uploader ? "recorded" : list && !list.ownerId ? "draft" : "unknown";
+    } else {
+      const first = shownLists[0] ? listsById.get(shownLists[0].id)?.list : undefined;
+      uploader = person(first?.ownerId ?? profiles[0]?.id);
+      uploaderSource = uploader ? "inferred" : first ? "draft" : "unknown";
+    }
+
+    return {
+      name: upload.name,
+      url: upload.url,
+      size: fileSize(upload.bytes),
+      uploaded: stamp(upload.uploadedAt),
+      uploader,
+      uploaderSource,
+      lists: shownLists,
+      profileOf: profiles.map((user) => user.name),
+    };
+  });
+}
+
 /* -------------------------------------------------------------------------- */
 /* The furniture. Every section is the same shape, so it is written once.    */
 /* -------------------------------------------------------------------------- */
+
+function Pill({ tone, children }: { tone: "ink" | "violet" | "rose"; children: ReactNode }) {
+  const tones = {
+    ink: "bg-ink/[.06] text-ink-72",
+    violet: "bg-violet-wash text-violet-hover",
+    rose: "bg-rose-wash text-rose",
+  };
+  return (
+    <span
+      className={`ml-2 rounded-pill px-2 py-0.5 align-middle text-2xs font-semibold ${tones[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
 
 function Section({
   title,
@@ -379,6 +521,7 @@ function Section({
   empty,
   note,
   before,
+  bare = false,
   children,
 }: {
   title: string;
@@ -389,6 +532,8 @@ function Section({
   note?: string;
   /** Sits between the heading and the rows: the "add one" form, where there is one. */
   before?: ReactNode;
+  /** The children lay themselves out, rather than being rows in a list. */
+  bare?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -409,6 +554,8 @@ function Section({
         <p className="rounded-card border border-dashed border-ink-line-strong px-6 py-10 text-center text-sm text-ink-72">
           {empty}
         </p>
+      ) : bare ? (
+        children
       ) : (
         <ul className="flex flex-col gap-2.5">{children}</ul>
       )}

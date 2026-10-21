@@ -3,7 +3,7 @@ import "server-only";
 import { createHmac, randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
@@ -65,11 +65,14 @@ export const getCurrentUser = cache(async () => {
       name: users.name,
       email: users.email,
       avatarUrl: users.avatarUrl,
+      isAdmin: users.isAdmin,
       expiresAt: sessions.expiresAt,
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
-    .where(eq(sessions.tokenHash, sha256(token)))
+    // Banning deletes their sessions too; this is for the one that was being
+    // used at that very moment, and anything else that slips past.
+    .where(and(eq(sessions.tokenHash, sha256(token)), isNull(users.bannedAt)))
     .get();
 
   if (!row || row.expiresAt.getTime() < Date.now()) return null;
@@ -82,6 +85,7 @@ export const getCurrentUser = cache(async () => {
     name: row.name,
     email: row.email,
     avatarUrl: row.avatarUrl,
+    isAdmin: row.isAdmin,
   };
 });
 

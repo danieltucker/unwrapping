@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { connection } from "next/server";
 
 import { db } from "@/db";
@@ -53,7 +53,7 @@ export async function allCategories(): Promise<CategoryWithCount[]> {
       description: categories.description,
       emoji: categories.emoji,
       createdAt: categories.createdAt,
-      guideCount: sql<number>`(select count(*) from ${lists} where ${lists.categoryId} = "categories"."id" and ${lists.kind} = 'guide' and ${lists.publishedAt} is not null)`,
+      guideCount: sql<number>`(select count(*) from ${lists} where ${lists.categoryId} = "categories"."id" and ${lists.kind} = 'guide' and ${lists.publishedAt} is not null and not exists (select 1 from "users" where "users"."id" = "lists"."owner_id" and "users"."banned_at" is not null))`,
     })
     .from(categories)
     .orderBy(asc(categories.name))
@@ -106,6 +106,7 @@ export async function publishedGuides({
       and(
         eq(lists.kind, "guide"),
         isNotNull(lists.publishedAt),
+        isNull(users.bannedAt),
         categoryId ? eq(lists.categoryId, categoryId) : undefined,
         sql`${giftCount} > 0`,
       ),

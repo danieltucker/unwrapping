@@ -91,7 +91,7 @@ export async function updateAvatar(
   const file = formData.get("avatar");
   if (!(file instanceof File)) return { error: "Choose an image first." };
 
-  const result = await saveUpload(file);
+  const result = await saveUpload(file, { userId: user.id, listId: null });
   if ("error" in result) return result;
 
   await db

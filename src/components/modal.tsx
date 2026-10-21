@@ -21,6 +21,8 @@ const WIDTHS = {
   sm: "w-[min(29rem,calc(100vw-2rem))]",
   md: "w-[min(30rem,calc(100vw-2rem))]",
   lg: "w-[min(34rem,calc(100vw-2rem))]",
+  // The admin screen's photo viewer, where the picture is the point.
+  xl: "w-[min(60rem,calc(100vw-2rem))]",
 } as const;
 
 export function Modal({

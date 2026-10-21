@@ -4,8 +4,8 @@ import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
-import { categories, items, lists, users } from "@/db/schema";
-import { adminOrNull } from "@/lib/admin";
+import { categories, items, lists, sessions, users } from "@/db/schema";
+import { adminOrNull, isAdmin, isAdminEmail } from "@/lib/admin";
 import { priceCheckState, runPriceChecks } from "@/lib/price-checks";
 import * as routes from "@/lib/routes";
 import { slugify } from "@/lib/slug";
@@ -13,7 +13,8 @@ import { deleteUpload } from "@/lib/uploads";
 
 /**
  * The three things the operator's screen can remove — an account, a list, and a
- * photo on disk — and the one thing it curates: the categories on /gifts.
+ * photo on disk — the one thing it curates, the categories on /gifts, and who
+ * among the accounts is an administrator or banned.
  *
  * Every one of them re-checks who is asking. A Server Action is reachable by a
  * POST from anywhere, not only from the page that renders the button, so the
@@ -187,6 +188,110 @@ export async function deleteImage(
   return { ok: true, message: "Deleted that photo." };
 }
 
+
+/**
+ * Makes an account an administrator, or stops it being one.
+ *
+ * The people in ADMIN_EMAILS can't be changed from here — they are the
+ * operator's own say-so, and the screen leaving them alone is what guarantees
+ * somebody can always get back in. Nor can you demote yourself: one mis-click
+ * would put you on the 404 with nobody to ask.
+ */
+export async function setAdmin(
+  _previous: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const admin = await adminOrNull();
+  if (!admin) return { error: NOT_ADMIN };
+
+  const userId = String(formData.get("userId") ?? "");
+  const grant = formData.get("grant") === "on";
+
+  const user = userId
+    ? await db
+        .select({ name: users.name, email: users.email, bannedAt: users.bannedAt })
+        .from(users)
+        .where(eq(users.id, userId))
+        .get()
+    : null;
+  if (!user) return { error: "That account is already gone." };
+
+  if (isAdminEmail(user.email)) {
+    return { error: "They're named in ADMIN_EMAILS. Change that on the server instead." };
+  }
+  if (!grant && userId === admin.id) {
+    return { error: "You can't remove your own admin access." };
+  }
+  if (grant && user.bannedAt) {
+    return { error: "Lift their ban first." };
+  }
+
+  await db.update(users).set({ isAdmin: grant }).where(eq(users.id, userId));
+
+  revalidatePath(routes.admin);
+  // The Admin link in their header.
+  revalidatePath("/", "layout");
+  return {
+    ok: true,
+    message: grant ? `${user.name} is now an admin.` : `${user.name} is no longer an admin.`,
+  };
+}
+
+/**
+ * Bans an account, or lifts the ban.
+ *
+ * Nothing is deleted, which is the difference from deleting the account: they
+ * are signed out everywhere and can't sign back in, and their lists answer 404
+ * and leave /gifts, but all of it returns when the ban is lifted. Reservations
+ * they made on other people's lists are left alone; those belong to the list's
+ * owner as much as to them.
+ *
+ * Admins can't be banned — remove their admin access first — so nobody can ban
+ * the person who is about to unban them.
+ */
+export async function setBanned(
+  _previous: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const admin = await adminOrNull();
+  if (!admin) return { error: NOT_ADMIN };
+
+  const userId = String(formData.get("userId") ?? "");
+  const ban = formData.get("ban") === "on";
+
+  const user = userId
+    ? await db
+        .select({ name: users.name, email: users.email, isAdmin: users.isAdmin })
+        .from(users)
+        .where(eq(users.id, userId))
+        .get()
+    : null;
+  if (!user) return { error: "That account is already gone." };
+
+  if (ban) {
+    if (userId === admin.id) return { error: "You can't ban yourself." };
+    if (isAdmin(user)) {
+      return {
+        error: isAdminEmail(user.email)
+          ? "They're named in ADMIN_EMAILS, so they can't be banned from here."
+          : "Remove their admin access before banning them.",
+      };
+    }
+
+    await db.update(users).set({ bannedAt: new Date() }).where(eq(users.id, userId));
+    await db.delete(sessions).where(eq(sessions.userId, userId));
+  } else {
+    await db.update(users).set({ bannedAt: null }).where(eq(users.id, userId));
+  }
+
+  revalidatePath(routes.admin);
+  // Every list of theirs either just vanished or just came back.
+  revalidatePath("/", "layout");
+  return {
+    ok: true,
+    message: ban ? `Banned ${user.name}.` : `Lifted ${user.name}'s ban.`,
+  };
+}
 
 /** Sub-paths of /gifts that a category slug must not shadow. */
 const RESERVED_CATEGORY_SLUGS = new Set(["new"]);

@@ -46,7 +46,7 @@ export async function uploadPhoto(
   const file = formData.get("photo");
   if (!(file instanceof File)) return { error: "Choose an image first." };
 
-  const result = await saveUpload(file);
+  const result = await saveUpload(file, { userId: list.ownerId, listId: list.id });
   if ("error" in result) return result;
 
   if (itemId) {

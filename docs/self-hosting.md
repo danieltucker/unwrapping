@@ -108,9 +108,12 @@ Two things to know before you open it up:
   invite gate. Set `ADMIN_EMAILS` to your own address and restart to get
   `/admin`, which lists every account, list and uploaded photo on the instance
   and can delete any of them. It is the only way to remove someone short of
-  editing the database, and there is no undo. Leave it unset and the screen 404s
-  for everybody, which is the right setting for an instance you are not
-  moderating.
+  editing the database, and deleting has no undo. Banning an account does: it
+  signs them out and takes their lists offline without deleting anything. From
+  there you can also make other accounts admins. People named in `ADMIN_EMAILS`
+  are always admins and can't be removed or banned from the screen, so you
+  can't be locked out. Leave it unset and the screen 404s for everybody, which
+  is the right setting for an instance you are not moderating.
 - **There is no password reset.** Nothing sends email yet, so a forgotten
   password means editing the database by hand. Use a password manager.
 

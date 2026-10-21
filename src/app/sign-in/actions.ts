@@ -37,6 +37,12 @@ export async function signIn(
 
   if (!user || !valid) return { error: "That email and password don't match." };
 
+  // Only said to someone who just proved the password, so it confirms nothing
+  // to a stranger guessing at addresses.
+  if (user.bannedAt) {
+    return { error: "This account has been suspended by the site's administrator." };
+  }
+
   // Anything reserved in this browser joins the account as well.
   const guestToken = await readGuestToken();
   if (guestToken) {

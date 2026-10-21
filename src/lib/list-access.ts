@@ -35,11 +35,13 @@ export async function resolveList(
     return list ? { list, ownerHandle: null } : null;
   }
 
+  // A banned owner's lists are gone as far as anyone outside /admin can tell,
+  // and come back untouched if the ban is lifted.
   const row = await db
     .select({ list: lists, handle: users.handle })
     .from(lists)
     .innerJoin(users, eq(users.id, lists.ownerId))
-    .where(and(eq(users.handle, handle), eq(lists.slug, key)))
+    .where(and(eq(users.handle, handle), eq(lists.slug, key), isNull(users.bannedAt)))
     .get();
 
   return row ? { list: row.list, ownerHandle: row.handle } : null;

@@ -10,7 +10,11 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 
+import { eq } from "drizzle-orm";
+
 import { formatBytes, uploads } from "@/config/site";
+import { db } from "@/db";
+import { uploads as uploadRecords } from "@/db/schema";
 
 /**
  * Owner-uploaded gift photos.
@@ -60,7 +64,16 @@ function sniff(bytes: Uint8Array): Extension | null {
 
 export type UploadResult = { url: string } | { error: string };
 
-export async function saveUpload(file: File): Promise<UploadResult> {
+/**
+ * Whose upload this is, recorded beside the file so /admin can name them. The
+ * list is the one it was uploaded to; a profile photo has none.
+ */
+export type Uploader = { userId: string | null; listId: string | null };
+
+export async function saveUpload(
+  file: File,
+  uploader: Uploader,
+): Promise<UploadResult> {
   if (file.size === 0) return { error: "That file was empty." };
   if (file.size > uploads.maxBytes) {
     return {
@@ -87,6 +100,8 @@ export async function saveUpload(file: File): Promise<UploadResult> {
     console.error(`[upload] could not write ${name}:`, error);
     return { error: "We couldn't save that photo. Try again in a moment." };
   }
+
+  await db.insert(uploadRecords).values({ name, ...uploader });
 
   return { url: `/uploads/${name}` };
 }
@@ -118,8 +133,9 @@ export type StoredUpload = {
 /**
  * Every photo on disk, newest first.
  *
- * The directory *is* the index: nothing records an upload in the database, so
- * there is no table to read and no chance of the two disagreeing. Files that
+ * The directory *is* the index. The `uploads` table only says whose each file
+ * is, and older files have no row in it, so it can't be the list of what
+ * exists without the two coming to disagree. Files that
  * don't match the stored-name pattern are skipped rather than listed — anything
  * else in there was put there by hand, and this screen can delete things.
  *
@@ -174,10 +190,12 @@ export async function deleteUpload(name: string): Promise<boolean> {
   try {
     await unlink(path.join(UPLOAD_DIR, name));
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
-    console.error(`[upload] could not delete ${name}:`, error);
-    return false;
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.error(`[upload] could not delete ${name}:`, error);
+      return false;
+    }
   }
 
+  await db.delete(uploadRecords).where(eq(uploadRecords.name, name));
   return true;
 }

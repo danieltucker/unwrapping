@@ -12,15 +12,21 @@ export function AdminActionButton({
   action,
   label,
   busyLabel,
+  fields = {},
 }: {
   action: (previous: AdminState, formData: FormData) => Promise<AdminState>;
   label: string;
   busyLabel: string;
+  /** Hidden inputs naming what to act on; the action re-checks them anyway. */
+  fields?: Record<string, string>;
 }) {
   const [state, submit, pending] = useActionState<AdminState, FormData>(action, {});
 
   return (
     <form action={submit} className="flex flex-wrap items-center gap-3">
+      {Object.entries(fields).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       <button
         type="submit"
         disabled={pending}
