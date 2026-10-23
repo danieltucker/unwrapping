@@ -132,7 +132,7 @@ A few things worth knowing before you change them:
   `isSantaFor`), and only surprise lists can be linked.
 - **Analytics are counts.** `analytics_events` holds an event name and a time,
   nothing else; see [`src/lib/analytics.ts`](src/lib/analytics.ts). The totals
-  are on `/admin`.
+  are on `/admin/analytics`.
 - **Tests that need the database** run the real server modules under plain Node
   through [`scripts/lib/app-loader.mjs`](scripts/lib/app-loader.mjs), which maps
   `@/`, stubs `server-only`, and fakes `next/headers` with a cookie jar.

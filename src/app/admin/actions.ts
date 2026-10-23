@@ -85,7 +85,7 @@ export async function deleteAccount(
    */
   await db.delete(users).where(eq(users.id, userId));
 
-  revalidatePath(routes.admin);
+  revalidatePath(routes.admin, "layout");
   // Their lists went with them, and any page that linked to one.
   revalidatePath("/", "layout");
   return { ok: true, message: `Deleted ${user.name}'s account.` };
@@ -113,7 +113,7 @@ export async function deleteList(
   // Gifts, and the claims and contributions on them, cascade from the list.
   await db.delete(lists).where(eq(lists.id, listId));
 
-  revalidatePath(routes.admin);
+  revalidatePath(routes.admin, "layout");
   // The URLs that just stopped existing, so a cached copy doesn't outlive them.
   revalidatePath(routes.publicList(row.list, row.ownerHandle));
   revalidatePath(routes.manageList(row.list, row.ownerHandle));
@@ -191,7 +191,7 @@ export async function deleteImage(
     return { error: "We couldn't delete that file. Check the server log." };
   }
 
-  revalidatePath(routes.admin);
+  revalidatePath(routes.admin, "layout");
   // A photo can appear on any list and in any header.
   revalidatePath("/", "layout");
   return { ok: true, message: "Deleted that photo." };
@@ -237,7 +237,7 @@ export async function setAdmin(
 
   await db.update(users).set({ isAdmin: grant }).where(eq(users.id, userId));
 
-  revalidatePath(routes.admin);
+  revalidatePath(routes.admin, "layout");
   // The Admin link in their header.
   revalidatePath("/", "layout");
   return {
@@ -293,7 +293,7 @@ export async function setBanned(
     await db.update(users).set({ bannedAt: null }).where(eq(users.id, userId));
   }
 
-  revalidatePath(routes.admin);
+  revalidatePath(routes.admin, "layout");
   // Every list of theirs either just vanished or just came back.
   revalidatePath("/", "layout");
   return {
@@ -357,7 +357,7 @@ export async function saveCategory(
     await db.insert(categories).values({ name, slug, description, emoji });
   }
 
-  revalidatePath(routes.admin);
+  revalidatePath(routes.admin, "layout");
   revalidatePath(routes.giftGuides, "layout");
   revalidatePath("/");
   return { ok: true, message: existing ? `Saved “${name}”.` : `Added “${name}”.` };
@@ -384,7 +384,7 @@ export async function deleteCategory(
   // lists.categoryId is `set null`, so the guides on it simply lose their shelf.
   await db.delete(categories).where(eq(categories.id, id));
 
-  revalidatePath(routes.admin);
+  revalidatePath(routes.admin, "layout");
   revalidatePath(routes.giftGuides, "layout");
   revalidatePath("/");
   return { ok: true, message: `Deleted “${category.name}”.` };
@@ -423,7 +423,7 @@ export async function dismissReport(
     .set({ resolvedAt: new Date() })
     .where(eq(santaReports.id, String(formData.get("reportId") ?? "")));
 
-  revalidatePath(routes.admin);
+  revalidatePath(routes.admin, "layout");
   return { ok: true, message: "Dismissed." };
 }
 
@@ -449,7 +449,7 @@ export async function removeReportedMessage(
       .run();
   });
 
-  revalidatePath(routes.admin);
+  revalidatePath(routes.admin, "layout");
   return { ok: true, message: "Removed from the thread." };
 }
 
@@ -464,7 +464,7 @@ export async function toggleTrackingPaused(): Promise<AdminState> {
 
   const paused = !(await isTrackingPaused());
   await setTrackingPaused(paused);
-  revalidatePath(routes.admin);
+  revalidatePath(routes.admin, "layout");
   return {
     ok: true,
     message: paused ? "Paused. Nothing is being recorded." : "Recording again.",

@@ -91,3 +91,7 @@ export const profile = "/profile";
  * Reachable only by administrators; see `src/lib/admin.ts`.
  */
 export const admin = "/admin";
+/** Its tabs. `/admin` itself sends you to the first. */
+export const adminAnalytics = "/admin/analytics";
+export const adminAccounts = "/admin/accounts";
+export const adminLists = "/admin/lists";

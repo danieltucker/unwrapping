@@ -62,7 +62,7 @@ The switch is the `SECRET_SANTA` environment variable: `on` (default), `readonly
 5. Restart with `SECRET_SANTA=on`, then smoke-test using three private windows:
    - create an exchange, join from the other two windows, and add a fourth person by name
    - keep two people apart, draw, and reveal in each window
-   - send a message both ways, report one, and confirm it appears on `/admin`
+   - send a message both ways, report one, and confirm it appears on `/admin/accounts`
    - delete the test exchange
 6. Go live before **1 November**. The season banner turns itself on that day (`isSantaSeason`), so a decision made after then means users will already have seen the banner.
 
@@ -78,8 +78,8 @@ Don't delete `santa_*` rows to fix a bad draw. Have the organiser reset and redr
 
 ## Monitoring
 
-- **`/admin` → analytics:** `santa_group_created`, `santa_member_joined`, `santa_draw_run`, and `santa_reveal_opened`. Draws with no reveals over the following days suggest people can't find their link.
-- **`/admin` → reported messages:** check the queue daily during the season. A spike is the signal to switch to `readonly`.
+- **`/admin/analytics`:** `santa_group_created`, `santa_member_joined`, `santa_draw_run`, and `santa_reveal_opened`. Draws with no reveals over the following days suggest people can't find their link.
+- **`/admin/accounts` → reported messages:** check the queue daily during the season. A spike is the signal to switch to `readonly`.
 - **Server logs:** watch for 5xx responses under `/secret-santa/*` and `[analytics] could not record` lines. A run of 429s from the proxy limits means someone is scripting joins.
 - **Draw health:** this query lists exchanges drawn more than 3 days ago where under half of participants have looked:
   ```sql

@@ -580,6 +580,101 @@ section("Retention");
   check("deleting a list deletes its events", left.length === 0);
 }
 
+section("Admin filters");
+{
+  const { parseTrackingFilter, filterHref, hidingVisitor, DEFAULT_FILTER } = await import(
+    "../src/lib/tracking-filter.ts"
+  );
+  const { trackingOverview, latestEvents } = await import("../src/lib/tracking-stats.ts");
+
+  const parsed = parseTrackingFilter({
+    days: "7",
+    bots: "hide",
+    type: ["outbound_click", "nonsense", "list_view"],
+    visitor: "AAAAAAAAAAAAAAAAAAAAAA",
+    session: "not an id!",
+    hide: "BBBBBBBBBBBBBBBBBBBBBB,CCCCCCCCCCCCCCCCCCCCCC",
+  });
+  check("a filter is read from the query string", parsed.days === 7 && parsed.bots === "hide", parsed);
+  check("only known event types are kept, in their usual order",
+    JSON.stringify(parsed.types) === JSON.stringify(["list_view", "outbound_click"]), parsed.types);
+  check("a malformed id is ignored", parsed.session === null && parsed.visitor !== null, parsed);
+  check("hidden visitors can be comma-separated", parsed.hide.length === 2, parsed.hide);
+  check("junk falls back to the defaults",
+    JSON.stringify(parseTrackingFilter({ days: "13", bots: "maybe" })) === JSON.stringify(DEFAULT_FILTER));
+  check("the default filter is a plain URL", filterHref("/admin/analytics", DEFAULT_FILTER) === "/admin/analytics");
+  {
+    const round = parseTrackingFilter(new URLSearchParams(filterHref("/x", parsed).split("?")[1]));
+    check("a filter survives the round trip through its URL", JSON.stringify(round) === JSON.stringify(parsed), round);
+  }
+  {
+    const focused = { ...DEFAULT_FILTER, visitor: "AAAAAAAAAAAAAAAAAAAAAA" };
+    const hidden = { ...focused, ...hidingVisitor(focused, "AAAAAAAAAAAAAAAAAAAAAA") };
+    check("hiding the visitor you're looking at goes back to everyone",
+      hidden.visitor === null && hidden.hide[0] === "AAAAAAAAAAAAAAAAAAAAAA", hidden);
+  }
+
+  // Their own list, so nothing from the sections above is counted.
+  const shelf = db
+    .insert(schema.lists)
+    .values({ ownerId: owner.id, slug: "filters", name: "Filters", kind: "personal" })
+    .returning()
+    .get();
+  const gift = addItem({ listId: shelf.id, title: "Filtered gift" });
+  const person = "PERSONpersonPERSONpers";
+  const crawler = "CRAWLERcrawlerCRAWLERc";
+  const sneaky = "SNEAKYsneakySNEAKYsnea";
+  const event = (visitorId: string, eventType: "list_view" | "outbound_click", isBot = false) => ({
+    eventType,
+    visitorId,
+    sessionId: `${visitorId.slice(0, 11)}SESSIONxxxx`,
+    listId: shelf.id,
+    itemId: eventType === "outbound_click" ? gift.id : null,
+    isBot,
+  });
+  db.insert(schema.itemEvents)
+    .values([
+      event(person, "list_view"),
+      event(person, "outbound_click"),
+      event(crawler, "list_view", true),
+      event(crawler, "outbound_click", true),
+      // Looks like a person to the user-agent check, behaves like a bot.
+      ...Array.from({ length: 6 }, () => event(sneaky, "list_view")),
+      // No cookie at all: hiding a visitor must not take these out too.
+      { eventType: "list_view" as const, listId: shelf.id },
+    ])
+    .run();
+
+  const base = { ...DEFAULT_FILTER, list: shelf.id };
+  const all = await trackingOverview(base);
+  check("narrowed to a list, every one of its events counts", all.total === 11, all.total);
+  check("the busiest visitor comes first", all.topVisitors[0]?.visitorId === sneaky, all.topVisitors);
+  check("a flagged visitor is marked as a bot",
+    all.topVisitors.find((row) => row.visitorId === crawler)?.botEvents === 2, all.topVisitors);
+  check("top gifts leave bots out unless asked", all.topItems[0]?.clicks === 1, all.topItems);
+
+  const people = await trackingOverview({ ...base, bots: "hide" });
+  check("hiding bots drops the flagged ones", people.total === 9, people.total);
+  const bots = await trackingOverview({ ...base, bots: "only" });
+  check("bots only shows just them", bots.total === 2 && bots.botShare === 1, bots.total);
+  check("asked for bots, top gifts count their clicks", bots.topItems[0]?.clicks === 1, bots.topItems);
+
+  const hidden = await trackingOverview({ ...base, bots: "hide", hide: [sneaky] });
+  check("hiding a visitor takes out every one of their events, and nothing else", hidden.total === 3, hidden.total);
+
+  const one = await trackingOverview({ ...base, visitor: person });
+  check("one visitor's numbers are theirs alone", one.total === 2, one.total);
+  check("one visitor is summed up", one.visitor?.events === 2 && one.visitor.sessions === 1 && one.visitor.lists === 1, one.visitor);
+  check("their timeline is newest first, with names",
+    one.feed.length === 2 && one.feed[0].eventType === "outbound_click" && one.feed[0].itemTitle === "Filtered gift" && one.feed[0].listName === "Filters",
+    one.feed);
+
+  const clicks = await latestEvents({ ...base, types: ["outbound_click"] });
+  check("filtering by type narrows the feed", clicks.length === 2 && clicks.every((row) => row.eventType === "outbound_click"), clicks);
+  const session = await latestEvents({ ...base, session: `${crawler.slice(0, 11)}SESSIONxxxx` });
+  check("filtering by session narrows the feed", session.length === 2, session);
+}
+
 /* -------------------------------------------------------------------------- */
 
 // Windows won't delete a database file that is still open.
